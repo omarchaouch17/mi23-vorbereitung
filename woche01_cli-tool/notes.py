@@ -48,3 +48,10 @@ class NoteManager:
 
     def list_notes(self):
         return self.notes
+
+    def search_notes(self, begriff):
+        ergebnis = []
+        for notiz in self.notes:
+            if begriff in notiz.titel or begriff in notiz.inhalt:
+                ergebnis.append(notiz)
+        return ergebnis

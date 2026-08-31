@@ -55,3 +55,9 @@ class NoteManager:
             if begriff in notiz.titel or begriff in notiz.inhalt:
                 ergebnis.append(notiz)
         return ergebnis
+
+    def delete_note(self, note_id):
+        for notiz in self.notes:
+            if notiz.id == note_id:
+                self.notes.remove(notiz)
+                self.save()

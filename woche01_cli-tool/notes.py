@@ -1,5 +1,8 @@
 from dataclasses import dataclass, asdict
 from datetime import datetime
+import json
+from pathlib import Path
+
 
 @dataclass
 class Note:
@@ -11,9 +14,6 @@ class Note:
     def __post_init__(self):
         if self.erstellt_am is None:
             self.erstellt_am = datetime.now().isoformat()
-
-import json
-from pathlib import Path
 
 
 class NoteManager:
@@ -45,3 +45,6 @@ class NoteManager:
                 self.notes.append(Note(**d))
         else:
             self.notes = []
+
+    def list_notes(self):
+        return self.notes

@@ -18,7 +18,9 @@ def patient_hinzufuegen(name, diagnose):
     cursor = verbindung.cursor()
     cursor.execute("INSERT INTO patienten (name, diagnose) VALUES (?, ?)", (name, diagnose))
     verbindung.commit()
+    neue_id = cursor.lastrowid
     verbindung.close()
+    return neue_id
 
 def erstelle_condition_tabelle():
     verbindung = sqlite3.connect("patienten.db")
@@ -57,4 +59,12 @@ def patient_mit_diagnosen_anzeigen():
     ergebnisse = cursor.fetchall()
     for zeile in ergebnisse:
         print(zeile)
+    verbindung.close()
+
+def patient_loeschen(patient_id):
+    verbindung = sqlite3.connect("patienten.db")
+    cursor = verbindung.cursor()
+    cursor.execute("DELETE FROM conditions WHERE patient_id = ?", (patient_id,))
+    cursor.execute("DELETE FROM patienten WHERE id = ?", (patient_id,))
+    verbindung.commit()
     verbindung.close()

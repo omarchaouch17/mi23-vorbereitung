@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block inhalt %}
+<div class="lang-switch">
+    <a href="/?lang=de">DE</a> | <a href="/?lang=en">EN</a> | <a href="/?lang=fr">FR</a> | <a href="/?lang=ar">AR</a>
+</div>
+<h1>{{ titel }}</h1>
+<h2>{{ patienten_titel }}</h2>
+<p><a href="/neu">+ Neuen Patienten hinzufügen</a></p>
+
+{% for name, diagnose, patient_id in patienten %}
+<p>{{ name }} — {{ diagnose }} <a href="/loeschen/{{ patient_id }}" style="color:#f87171;">[löschen]</a></p>
+{% endfor %}
+{% endblock %}

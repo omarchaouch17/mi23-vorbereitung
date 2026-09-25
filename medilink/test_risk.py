@@ -54,3 +54,8 @@ def test_invalid_input_raises(bad_args):
 def test_age_boundaries_are_valid(age):
     result = framingham("m", age, 200, 50, 120, False, False)
     assert 0 < result < 100
+
+def test_mmol_input_raises():
+    # Cholesterol in mmol/L instead of mg/dL must be rejected
+    with pytest.raises(ValueError):
+        framingham("m", 55, 5.5, 1.3, 120, False, False)

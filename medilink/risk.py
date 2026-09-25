@@ -43,6 +43,12 @@ MODELS = {
     },
 }
 
+RANGES = {
+    "total_chol": (100, 400),  # mg/dL
+    "hdl": (20, 100),          # mg/dL
+    "sbp": (80, 220),          # mmHg
+}
+
 
 def framingham(sex, age, total_chol, hdl, sbp, treated_hypertension, smoker):
     """Return the 10-year risk of MI or coronary death in % (1 decimal).
@@ -53,9 +59,10 @@ def framingham(sex, age, total_chol, hdl, sbp, treated_hypertension, smoker):
         raise ValueError("sex must be 'm' or 'f'")
     if not 30 <= age <= 79:
         raise ValueError("score is only validated for ages 30-79")
-    if min(total_chol, hdl, sbp) <= 0:
-        raise ValueError("lab values and blood pressure must be positive")
-
+    for name, value in [("total_chol", total_chol), ("hdl", hdl), ("sbp", sbp)]:
+        low, high = RANGES[name]
+        if not low <= value <= high:
+            raise ValueError(f"{name} must be between {low} and {high} (mg/dL for cholesterol, mmHg for SBP)")
     model = MODELS[sex]
     c = model["coef"]
 

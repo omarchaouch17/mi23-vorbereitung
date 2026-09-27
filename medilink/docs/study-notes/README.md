@@ -6,6 +6,7 @@ Each file covers one topic I worked through while building the project.
 | # | Topic | File |
 |---|-------|------|
 | 01 | Framingham Hard CHD Risk Score | [01_Framingham_Risk_Score_Notes.pdf](01_Framingham_Risk_Score_Notes.pdf) |
+| 02 | Testing with pytest | [02_Testing_with_pytest_Notes.pdf](02_Testing_with_pytest_Notes.pdf) |
 
 ## 01 – Framingham Hard CHD Risk Score
 

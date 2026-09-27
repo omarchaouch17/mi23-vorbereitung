@@ -64,7 +64,7 @@ def hinzufuegen():
     )
 
 
-@app.route("/loeschen/<int:patient_id>")
+@app.route("/loeschen/<int:patient_id>", methods=["POST"])
 def loeschen(patient_id):
     patient_loeschen(patient_id)
 
@@ -73,6 +73,7 @@ def loeschen(patient_id):
         richtung="ltr",
         nachricht="Patient erfolgreich gelöscht."
     )
+
 
 
 if __name__ == "__main__":

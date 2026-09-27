@@ -36,3 +36,24 @@ def test_add_patient_shows_confirmation(client, fake_db):
     assert response.status_code == 200
     assert "erfolgreich gespeichert" in response.get_data(as_text=True)
     assert fake_db == ["Test Patient"]   # the patient was passed to the "database"
+
+
+@pytest.fixture
+def fake_delete(monkeypatch):
+    """Replace patient_loeschen so tests never delete real patients."""
+    deleted = []
+    monkeypatch.setattr(app_module, "patient_loeschen",
+                        lambda patient_id: deleted.append(patient_id))
+    return deleted
+
+
+def test_delete_via_get_is_not_allowed(client, fake_delete):
+    response = client.get("/loeschen/1")
+    assert response.status_code == 405   # 405 = Method Not Allowed
+    assert fake_delete == []             # nothing was deleted
+
+
+def test_delete_via_post_works(client, fake_delete):
+    response = client.post("/loeschen/1")
+    assert response.status_code == 200
+    assert fake_delete == [1]            # patient 1 was deleted

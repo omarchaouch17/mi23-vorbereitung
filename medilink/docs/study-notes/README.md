@@ -24,8 +24,9 @@ Framingham Heart Study, which followed thousands of people over decades.
 
 **What I learned**
 
-<!-- Write this part yourself: 2–3 sentences in your own words.
-     What did you learn? What surprised you? -->
+-What surprised me most was that age is by far the biggest factor: with the same cholesterol and blood pressure, the risk rose from 0.2 % at age 30 to 16.8 % at age 79.
+
+-The biggest lesson was that a passing test doesn't prove the code is correct: when I broke a test on purpose, it still passed for age 30 and only failed for age 79.
 
 ## How these notes were made
 

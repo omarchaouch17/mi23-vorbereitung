@@ -1,7 +1,9 @@
 from flask import Flask, request, render_template
-from fhir_db import patient_mit_diagnosen_anzeigen, patient_hinzufuegen, condition_hinzufuegen, patient_loeschen
+from fhir_db import patient_mit_diagnosen_anzeigen, patient_hinzufuegen, condition_hinzufuegen, patient_loeschen, risiko_speichern
 from translations import texte, diagnose_uebersetzung # type: ignore
 import sqlite3
+from risk import framingham
+from fhir_db import risiko_speichern, erstelle_risk_score_tabelle
 
 
 def hole_patienten_mit_diagnosen():
@@ -74,6 +76,30 @@ def loeschen(patient_id):
         nachricht="Patient erfolgreich gelöscht."
     )
 
+@app.route("/risiko")
+def risiko_formular():
+    return render_template("risiko.html", titel="MediLink", richtung="ltr")
+
+
+@app.route("/risiko_berechnen", methods=["POST"])
+def risiko_berechnen():
+    patient_id = int(request.form["patient_id"])
+    sex = request.form["sex"]
+    alter = int(request.form["alter"])
+    cholesterin = float(request.form["cholesterin"])
+    hdl = float(request.form["hdl"])
+    blutdruck = float(request.form["blutdruck"])
+    raucher = "raucher" in request.form
+    behandelt = "behandelt" in request.form
+
+    risiko_prozent = framingham(sex, alter, cholesterin, hdl, blutdruck, behandelt, raucher)
+    risiko_speichern(patient_id, alter, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent)
+
+    return render_template("bestaetigung.html",
+        titel="MediLink",
+        richtung="ltr",
+        nachricht=f"Risiko berechnet: {risiko_prozent}% (10-Jahres-Risiko). Dies ist eine Absch\u00e4tzung, kein Diagnoseinstrument."
+    )
 
 
 if __name__ == "__main__":

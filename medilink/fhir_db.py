@@ -1,4 +1,5 @@
-﻿import sqlite3
+﻿import datetime
+import sqlite3
 
 def erstelle_tabelle():
     verbindung = sqlite3.connect("patienten.db")
@@ -66,5 +67,38 @@ def patient_loeschen(patient_id):
     cursor = verbindung.cursor()
     cursor.execute("DELETE FROM conditions WHERE patient_id = ?", (patient_id,))
     cursor.execute("DELETE FROM patienten WHERE id = ?", (patient_id,))
+    verbindung.commit()
+    verbindung.close()
+
+
+def erstelle_risk_score_tabelle():
+    verbindung = sqlite3.connect("patienten.db")
+    cursor = verbindung.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS risk_scores (
+            id INTEGER PRIMARY KEY,
+            patient_id INTEGER,
+            datum TEXT,
+            alter_wert INTEGER,
+            cholesterin REAL,
+            hdl REAL,
+            blutdruck REAL,
+            raucher INTEGER,
+            behandelt INTEGER,
+            risiko_prozent REAL,
+            FOREIGN KEY (patient_id) REFERENCES patienten (id)
+        )
+    """)
+    verbindung.commit()
+    verbindung.close()
+
+
+def risiko_speichern(patient_id, alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent):
+    verbindung = sqlite3.connect("patienten.db")
+    cursor = verbindung.cursor()
+    cursor.execute(
+        "INSERT INTO risk_scores (patient_id, datum, alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (patient_id, datetime.date.today().isoformat(), alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent)
+    )
     verbindung.commit()
     verbindung.close()

@@ -5,8 +5,24 @@ diagnose_uebersetzung = {
 }
 
 texte = {
-    "de": {"titel": "MediLink", "patienten": "Patienten", "diagnose": "Diagnose"},
-    "en": {"titel": "MediConnect", "patienten": "Patients", "diagnose": "Diagnosis"},
-    "fr": {"titel": "MédiLien", "patienten": "Patients", "diagnose": "Diagnostic"},
-    "ar": {"titel": "رابط طبي", "patienten": "المرضى", "diagnose": "التشخيص"}
+    "de": {"titel": "MediLink", "patienten": "Patienten", "diagnose": "Diagnose",
+           "risiko_titel": "Framingham-Risikoscore berechnen",
+           "risiko_hinweis": "Nur zur Veranschaulichung - kein Diagnoseinstrument.",
+           "berechnen": "Berechnen",
+           "maennlich": "Männlich", "weiblich": "Weiblich"},
+    "en": {"titel": "MediConnect", "patienten": "Patients", "diagnose": "Diagnosis",
+           "risiko_titel": "Calculate Framingham Risk Score",
+           "risiko_hinweis": "For illustration only - not a diagnostic tool.",
+           "berechnen": "Calculate",
+           "maennlich": "Male", "weiblich": "Female"},
+    "fr": {"titel": "MédiLien", "patienten": "Patients", "diagnose": "Diagnostic",
+           "risiko_titel": "Calculer le score de risque de Framingham",
+           "risiko_hinweis": "À titre d'illustration uniquement - pas un outil de diagnostic.",
+           "berechnen": "Calculer",
+           "maennlich": "Homme", "weiblich": "Femme"},
+    "ar": {"titel": "رابط طبي", "patienten": "المرضى", "diagnose": "التشخيص",
+           "risiko_titel": "حساب درجة خطر فرامنغهام",
+           "risiko_hinweis": "للتوضيح فقط - ليست أداة تشخيصية.",
+           "berechnen": "احسب",
+           "maennlich": "ذكر", "weiblich": "أنثى"}
 }

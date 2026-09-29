@@ -12,7 +12,7 @@
 <div style="margin: 10px 0;">
     {{ name }} — {{ diagnose }}
     <form action="/loeschen/{{ patient_id }}" method="POST" style="display:inline;"
-          onsubmit="return confirm('Patient {{ name }} wirklich löschen?');">
+        onsubmit="return confirm('Patient {{ name }} wirklich löschen?');">
         <button type="submit" style="background:#f87171;">löschen</button>
     </form>
 </div>

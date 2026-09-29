@@ -78,7 +78,10 @@ def loeschen(patient_id):
 
 @app.route("/risiko")
 def risiko_formular():
-    return render_template("risiko.html", titel="MediLink", richtung="ltr")
+    sprache = request.args.get("lang", "de")
+    t = texte[sprache]
+    richtung = "rtl" if sprache == "ar" else "ltr"
+    return render_template("risiko.html", titel=t['titel'], richtung=richtung, t=t)
 
 
 @app.route("/risiko_berechnen", methods=["POST"])

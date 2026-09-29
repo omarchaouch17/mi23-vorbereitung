@@ -1,13 +1,13 @@
 ﻿{% extends "base.html" %}
 
 {% block inhalt %}
-<h1>Framingham-Risikoscore berechnen</h1>
-<p style="color:#fbbf24; font-size:0.9em;">Nur zur Veranschaulichung - kein Diagnoseinstrument.</p>
+<h1>{{ t['risiko_titel'] }}</h1>
+<p style="color:#fbbf24; font-size:0.9em;">{{ t['risiko_hinweis'] }}</p>
 <form action="/risiko_berechnen" method="POST">
     <input type="number" name="patient_id" placeholder="Patient-ID" required><br>
     <select name="sex" required>
-        <option value="m">Männlich</option>
-        <option value="f">Weiblich</option>
+        <option value="m">{{ t['maennlich'] }}</option>
+        <option value="f">{{ t['weiblich'] }}</option>
     </select><br>
     <input type="number" name="alter" placeholder="Alter" required><br>
     <input type="number" name="cholesterin" placeholder="Gesamtcholesterin (mg/dL)" required><br>
@@ -15,7 +15,7 @@
     <input type="number" name="blutdruck" placeholder="Systolischer Blutdruck" required><br>
     <label><input type="checkbox" name="raucher"> Raucher</label><br>
     <label><input type="checkbox" name="behandelt"> Blutdruckbehandlung</label><br>
-    <button type="submit">Berechnen</button>
+    <button type="submit">{{ t['berechnen'] }}</button>
 </form>
 <br>
 <a href="/">Zurück zur Übersicht</a>

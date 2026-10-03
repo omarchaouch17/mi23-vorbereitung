@@ -4,7 +4,7 @@
 <h1>{{ t['risiko_titel'] }}</h1>
 <p style="color:#fbbf24; font-size:0.9em;">{{ t['risiko_hinweis'] }}</p>
 <form action="/risiko_berechnen" method="POST">
-    <input type="number" name="patient_id" placeholder="Patient-ID" required><br>
+    <input type="text" name="name" placeholder="Name" required><br>
     <select name="sex" required>
         <option value="m">{{ t['maennlich'] }}</option>
         <option value="f">{{ t['weiblich'] }}</option>

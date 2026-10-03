@@ -16,7 +16,7 @@ def hole_patienten_mit_diagnosen():
     cursor.execute("""
         SELECT patienten.name, conditions.code_text, conditions.category_text, patienten.id
         FROM patienten
-        JOIN conditions ON patienten.id = conditions.patient_id
+        LEFT JOIN conditions ON patienten.id = conditions.patient_id
     """)
     ergebnisse = cursor.fetchall()
     verbindung.close()
@@ -31,11 +31,12 @@ def home():
 
     patienten_gruppiert = {}
     for name, diagnose, kategorie, patient_id in daten:
-        if sprache != "de" and diagnose in diagnose_uebersetzung:
+        if diagnose is None:
+            diagnose_angezeigt = "Keine Diagnose"
+        elif sprache != "de" and diagnose in diagnose_uebersetzung:
             diagnose_angezeigt = diagnose_uebersetzung[diagnose][sprache]
         else:
             diagnose_angezeigt = diagnose
-
         if patient_id not in patienten_gruppiert:
             risiko = hole_neuestes_risiko(patient_id)
             patienten_gruppiert[patient_id] = {
@@ -98,7 +99,7 @@ def risiko_formular():
 
 @app.route("/risiko_berechnen", methods=["POST"])
 def risiko_berechnen():
-    patient_id = int(request.form["patient_id"])
+    name = request.form["name"]
     sex = request.form["sex"]
     alter = int(request.form["alter"])
     cholesterin = float(request.form["cholesterin"])
@@ -107,6 +108,7 @@ def risiko_berechnen():
     raucher = "raucher" in request.form
     behandelt = "behandelt" in request.form
 
+    patient_id = patient_hinzufuegen(name, "siehe conditions")
     risiko_prozent = framingham(sex, alter, cholesterin, hdl, blutdruck, behandelt, raucher)
     risiko_speichern(patient_id, alter, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent)
 

@@ -92,6 +92,19 @@ def erstelle_risk_score_tabelle():
     verbindung.commit()
     verbindung.close()
 
+def hole_neuestes_risiko(patient_id):
+    verbindung = sqlite3.connect("patienten.db")
+    cursor = verbindung.cursor()
+    cursor.execute("""
+        SELECT risiko_prozent, datum
+        FROM risk_scores
+        WHERE patient_id = ?
+        ORDER BY datum DESC
+        LIMIT 1
+    """, (patient_id,))
+    ergebnis = cursor.fetchone()
+    verbindung.close()
+    return ergebnis
 
 def risiko_speichern(patient_id, alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent):
     verbindung = sqlite3.connect("patienten.db")

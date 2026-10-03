@@ -1,7 +1,7 @@
 from flask import Flask, request, render_template
 from fhir_db import (
     patient_hinzufuegen, condition_hinzufuegen, patient_loeschen,
-    risiko_speichern, hole_neuestes_risiko
+    risiko_speichern, hole_neuestes_risiko, hole_alle_risiken
 )
 from translations import texte, diagnose_uebersetzung
 from risk import framingham
@@ -117,6 +117,11 @@ def risiko_berechnen():
         richtung="ltr",
         nachricht=f"Risiko berechnet: {risiko_prozent}% (10-Jahres-Risiko). Dies ist eine Abschätzung, kein Diagnoseinstrument."
     )
+
+@app.route("/verlauf/<int:patient_id>")
+def verlauf(patient_id):
+    risiken = hole_alle_risiken(patient_id)
+    return render_template("verlauf.html", titel="MediLink", richtung="ltr", risiken=risiken, patient_id=patient_id)
 
 
 if __name__ == "__main__":

@@ -115,3 +115,17 @@ def risiko_speichern(patient_id, alter_wert, cholesterin, hdl, blutdruck, rauche
     )
     verbindung.commit()
     verbindung.close()
+
+
+def hole_alle_risiken(patient_id):
+    verbindung = sqlite3.connect("patienten.db")
+    cursor = verbindung.cursor()
+    cursor.execute("""
+        SELECT risiko_prozent, datum
+        FROM risk_scores
+        WHERE patient_id = ?
+        ORDER BY datum DESC
+    """, (patient_id,))
+    ergebnisse = cursor.fetchall()
+    verbindung.close()
+    return ergebnisse

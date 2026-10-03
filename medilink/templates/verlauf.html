@@ -1,0 +1,17 @@
+﻿{% extends "base.html" %}
+
+{% block inhalt %}
+<h1>Risiko-Verlauf</h1>
+{% if risiken %}
+    <table style="margin: 0 auto; color: #e2e8f0;">
+        <tr><th style="padding: 5px 15px;">Datum</th><th style="padding: 5px 15px;">Risiko</th></tr>
+        {% for prozent, datum in risiken %}
+        <tr><td style="padding: 5px 15px;">{{ datum }}</td><td style="padding: 5px 15px;">{{ prozent }}%</td></tr>
+        {% endfor %}
+    </table>
+{% else %}
+    <p>Noch keine Risiko-Berechnung für diesen Patienten.</p>
+{% endif %}
+<br>
+<a href="/">Zurück zur Übersicht</a>
+{% endblock %}

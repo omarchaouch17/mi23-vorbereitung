@@ -415,3 +415,70 @@ def test_newest_risk_wins_when_two_scores_are_saved_on_the_same_day(tmp_path, mo
     fhir_db.risiko_speichern(pid, 56, 230, 50, 140, 0, 0, 9.4)
     assert fhir_db.hole_neuestes_risiko(pid)[0] == 9.4
     assert [r[0] for r in fhir_db.hole_alle_risiken(pid)] == [9.4, 8.3]
+
+
+# ---------- Hinweise zum Ergebnis (regelbasiert) ----------
+
+from ratschlaege import risiko_kategorie, hole_tipps
+
+
+@pytest.mark.parametrize("prozent,erwartet", [
+    (0.0, "niedrig"), (9.9, "niedrig"), (10.0, "mittel"), (20.0, "mittel"), (20.1, "hoch"), (45.0, "hoch"),
+])
+def test_risk_categories_follow_atp3_thresholds(prozent, erwartet):
+    assert risiko_kategorie(prozent) == erwartet
+
+
+def werte(**o):
+    basis = {"sex": "m", "cholesterin": 200.0, "hdl": 55.0, "blutdruck": 120.0, "raucher": False}
+    basis.update(o)
+    return basis
+
+
+def test_healthy_values_only_give_basic_tips():
+    assert hole_tipps(werte(), "niedrig") == ["tipp_niedrig", "tipp_bewegung", "tipp_ernaehrung"]
+
+
+def test_each_risk_factor_adds_its_own_tip():
+    tipps = hole_tipps(werte(raucher=True, blutdruck=150.0, cholesterin=250.0, hdl=35.0), "hoch")
+    assert tipps[0] == "tipp_hoch"
+    for k in ("tipp_rauchen", "tipp_blutdruck", "tipp_cholesterin", "tipp_hdl"):
+        assert k in tipps
+
+
+def test_hdl_threshold_differs_by_sex():
+    assert "tipp_hdl" not in hole_tipps(werte(sex="m", hdl=45.0), "niedrig")   # Mann: ab 40 ok
+    assert "tipp_hdl" in hole_tipps(werte(sex="f", hdl=45.0), "niedrig")       # Frau: unter 50 niedrig
+
+
+def test_result_page_shows_category_tips_and_emergency_note(client, fake_risk):
+    html = post_risk(client, cholesterin="260", blutdruck="150", raucher="on").get_data(as_text=True)
+    assert 'class="kat kat-' in html and "Allgemeine Hinweise" in html
+    assert "Rauchen" in html and "Blutdruck" in html and "cholesterin" in html
+    assert "Notruf 112" in html and "keine ärztliche Beratung" in html
+
+
+def test_result_page_tips_follow_language(client, fake_risk):
+    html = post_risk(client, lang="fr", raucher="on").get_data(as_text=True)
+    assert "Conseils généraux" in html and "appelez immédiatement le 112" in html
+    assert "Allgemeine Hinweise" not in html
+    html = post_risk(client, lang="ar", raucher="on").get_data(as_text=True)
+    assert "نصائح عامة" in html and "112" in html
+
+
+def test_patient_confirmation_has_no_tips_block(client, fake_db):
+    html = post_patient(client).get_data(as_text=True)
+    assert "Allgemeine Hinweise" not in html
+
+
+# ---------- Animation beim Betreten ----------
+
+def test_home_has_intro_animation_with_title_in_selected_language(client, fake_home):
+    html = client.get("/?lang=fr").get_data(as_text=True)
+    assert 'id="intro"' in html and "MédiLien" in html
+    assert "prefers-reduced-motion" in html         # respektiert die Systemeinstellung
+
+
+def test_other_pages_have_no_intro(client, fake_home):
+    assert 'id="intro"' not in client.get("/risiko").get_data(as_text=True)
+    assert 'id="intro"' not in client.get("/neu").get_data(as_text=True)

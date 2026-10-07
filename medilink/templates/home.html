@@ -1,6 +1,50 @@
 {% extends "base.html" %}
 
 {% block inhalt %}
+<!-- Animations-Intro: nur beim ersten Besuch pro Sitzung, per Klick ueberspringbar, aus bei "reduzierte Bewegung" -->
+<div id="intro" aria-hidden="true">
+    <svg viewBox="0 0 300 80" width="280" height="75" role="presentation">
+        <path class="ekg" d="M0 40 H70 L85 40 L95 10 L110 70 L122 25 L130 40 H300" />
+    </svg>
+    <div class="intro-titel">{{ t.titel }}</div>
+</div>
+<style>
+    #intro { display: none; position: fixed; inset: 0; z-index: 1000; background: #0f172a;
+             flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+    #intro.aktiv { display: flex; animation: intro-aus .5s ease 1.9s forwards; }
+    #intro .ekg { fill: none; stroke: #38bdf8; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+                  stroke-dasharray: 420; stroke-dashoffset: 420; animation: ekg-zeichnen 1.3s ease-out .1s forwards;
+                  filter: drop-shadow(0 0 6px #38bdf8); }
+    #intro .intro-titel { margin-top: 14px; font-size: 2rem; font-weight: 700; color: #38bdf8; opacity: 0;
+                          animation: intro-ein .6s ease .8s forwards; }
+    #hauptinhalt.einblenden { animation: intro-ein .6s ease 1.9s both; }
+    @keyframes ekg-zeichnen { to { stroke-dashoffset: 0; } }
+    @keyframes intro-ein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes intro-aus { to { opacity: 0; visibility: hidden; } }
+    @media (prefers-reduced-motion: reduce) { #intro, #intro.aktiv { display: none; } #hauptinhalt.einblenden { animation: none; } }
+</style>
+<script>
+(function () {
+    var intro = document.getElementById('intro');
+    var gesehen = false;
+    try { gesehen = sessionStorage.getItem('medilink-intro') === '1'; } catch (e) {}
+    var reduziert = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (gesehen || reduziert) { intro.remove(); return; }
+    try { sessionStorage.setItem('medilink-intro', '1'); } catch (e) {}
+    intro.classList.add('aktiv');
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('hauptinhalt').classList.add('einblenden');
+    });
+    function weg() { intro.remove(); }
+    intro.addEventListener('click', function () {      // Klick = ueberspringen
+        document.getElementById('hauptinhalt').classList.remove('einblenden');
+        weg();
+    });
+    setTimeout(weg, 2500);
+})();
+</script>
+
+<div id="hauptinhalt">
 <h1>{{ t.titel }}</h1>
 <h2>{{ t.patienten }}</h2>
 <p>
@@ -34,4 +78,5 @@
     </ul>
 </div>
 {% endfor %}
+</div>
 {% endblock %}

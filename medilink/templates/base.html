@@ -104,6 +104,35 @@
             width: min(320px, 90%);
             text-align: start;
         }
+
+        /* Ergebnis-Seite: Risikokategorie (immer mit Text, nicht nur Farbe), Hinweise, Notfall */
+        .kat {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 999px;
+            font-weight: 600;
+            border: 1px solid transparent;
+        }
+
+        .kat-niedrig { background: #064e3b; color: #a7f3d0; border-color: #34d399; }
+        .kat-mittel { background: #451a03; color: #fde68a; border-color: #fbbf24; }
+        .kat-hoch { background: #450a0a; color: #fecaca; border-color: #f87171; }
+
+        .tipps {
+            display: inline-block;
+            max-width: min(520px, 92%);
+            text-align: start;
+            line-height: 1.5;
+        }
+
+        .notfall {
+            margin: 14px auto;
+            max-width: min(520px, 92%);
+            padding: 8px 12px;
+            border-inline-start: 4px solid #f87171;
+            background: #1e293b;
+            text-align: start;
+        }
     </style>
 </head>
 

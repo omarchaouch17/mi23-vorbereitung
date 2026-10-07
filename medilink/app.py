@@ -11,6 +11,7 @@ from translations import (
     texte, uebersetze_diagnose, kategorie_name, KATEGORIEN, DIAGNOSEN, ANDERE
 )
 from risk import framingham
+from ratschlaege import risiko_kategorie, hole_tipps
 from validierung import (
     RISIKO_FELDER, validiere_risiko, validiere_patient
 )
@@ -160,8 +161,10 @@ def risiko_berechnen():
     risiko_speichern(werte["patient_id"], werte["alter"], werte["cholesterin"], werte["hdl"],
                      werte["blutdruck"], werte["raucher"], werte["behandelt"], risiko_prozent)
 
+    kategorie = risiko_kategorie(risiko_prozent)
     return render_template("bestaetigung.html",
                            nachricht=f"{werte['name']}: " + t["ergebnis"].format(p=risiko_prozent),
+                           kategorie=kategorie, tipps=hole_tipps(werte, kategorie),
                            zeige_sprachen=False)
 
 

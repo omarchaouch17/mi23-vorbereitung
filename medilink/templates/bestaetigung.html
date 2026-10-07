@@ -2,6 +2,17 @@
 
 {% block inhalt %}
 <h1>{{ nachricht }}</h1>
+
+{% if tipps %}
+<p class="kat kat-{{ kategorie }}">{{ t['kat_' ~ kategorie] }}</p>
+<h2>{{ t.tipps_titel }}</h2>
+<ul class="tipps">
+    {% for k in tipps %}<li>{{ t[k] }}</li>{% endfor %}
+</ul>
+<p class="notfall" role="note">{{ t.notfall }}</p>
+<p class="hinweis">{{ t.keine_beratung }}</p>
+{% endif %}
+
 <br>
 <a href="/?lang={{ lang }}">{{ t.zurueck }}</a>
 {% endblock %}

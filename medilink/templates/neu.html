@@ -6,14 +6,31 @@
 <form action="/hinzufuegen" method="POST" novalidate>
     <input type="hidden" name="lang" value="{{ lang }}">
 
-    {% for feld, label, maximum in [("name", t.neu_name, 60), ("diagnose", t.neu_diagnose, 80)] %}
     <div class="feld">
-        <label for="{{ feld }}">{{ label }}</label>
-        <input type="text" id="{{ feld }}" name="{{ feld }}" maxlength="{{ maximum }}"
-               value="{{ werte.get(feld, '') }}" {% if fehler.get(feld) %}class="ungueltig"{% endif %}>
-        <div class="fehler" role="alert">{{ fehler.get(feld, '') }}</div>
+        <label for="name">{{ t.neu_name }}</label>
+        <input type="text" id="name" name="name" maxlength="60" value="{{ werte.get('name', '') }}"
+               {% if fehler.get('name') %}class="ungueltig"{% endif %}>
+        <div class="fehler" role="alert">{{ fehler.get('name', '') }}</div>
     </div>
-    {% endfor %}
+
+    <div class="feld">
+        <label for="diagnose">{{ t.neu_diagnose }}</label>
+        <select id="diagnose" name="diagnose" {% if fehler.get('diagnose') %}class="ungueltig"{% endif %}>
+            <option value="" disabled {% if not werte.get('diagnose_wahl') %}selected{% endif %}>{{ t.waehlen }}</option>
+            {% for d in diagnosen %}
+            <option value="{{ d }}" {% if werte.get('diagnose_wahl') == d %}selected{% endif %}>{{ diagnose_name(d, lang) }}</option>
+            {% endfor %}
+            <option value="{{ ANDERE }}" {% if werte.get('diagnose_wahl') == ANDERE %}selected{% endif %}>{{ t.andere }}</option>
+        </select>
+        <div class="fehler" role="alert">{{ fehler.get('diagnose', '') }}</div>
+    </div>
+
+    <div class="feld" id="frei-box">
+        <label for="diagnose_frei">{{ t.frei_label }}</label>
+        <input type="text" id="diagnose_frei" name="diagnose_frei" maxlength="80"
+               value="{{ werte.get('diagnose_frei', '') }}" {% if fehler.get('diagnose_frei') %}class="ungueltig"{% endif %}>
+        <div class="fehler" role="alert">{{ fehler.get('diagnose_frei', '') }}</div>
+    </div>
 
     <div class="feld">
         <label for="kategorie">{{ t.neu_kategorie }}</label>
@@ -30,4 +47,13 @@
 </form>
 <br>
 <a href="/?lang={{ lang }}">{{ t.zurueck }}</a>
+<script>
+// Das freie Textfeld erscheint nur, wenn "Andere" gewaehlt ist (ohne JavaScript bleibt es sichtbar).
+(function () {
+    var auswahl = document.getElementById('diagnose'), box = document.getElementById('frei-box');
+    function umschalten() { box.style.display = (auswahl.value === {{ ANDERE|tojson }}) ? '' : 'none'; }
+    auswahl.addEventListener('change', umschalten);
+    umschalten();
+})();
+</script>
 {% endblock %}

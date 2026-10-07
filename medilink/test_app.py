@@ -4,7 +4,7 @@ import re
 import pytest
 import app as app_module
 from app import app
-from translations import texte, diagnose_uebersetzung, kategorie_uebersetzung, KATEGORIEN
+from translations import texte, diagnose_uebersetzung, kategorie_uebersetzung, KATEGORIEN, DIAGNOSEN, ANDERE
 
 VALID = {"name": "Demo", "sex": "m", "alter": "55", "cholesterin": "220",
          "hdl": "50", "blutdruck": "140", "lang": "de"}
@@ -265,3 +265,82 @@ def test_selected_category_stays_after_error(client, fake_db):
     html = client.post("/hinzufuegen", data={"name": "", "diagnose": "x",
                                              "kategorie": "Onkologie"}).get_data(as_text=True)
     assert 'value="Onkologie" selected' in html
+
+
+# ---------- Diagnose: Auswahl + "Andere" ----------
+
+def test_diagnosis_is_a_dropdown_with_other_option(client):
+    html = client.get("/neu").get_data(as_text=True)
+    assert '<select id="diagnose" name="diagnose"' in html
+    for d in DIAGNOSEN:
+        assert f'value="{d}"' in html
+    assert f'value="{ANDERE}"' in html and 'name="diagnose_frei"' in html
+
+
+@pytest.mark.parametrize("lang,erwartet", [
+    ("en", ["Heart failure", "Stroke", "Other (enter yourself)"]),
+    ("fr", ["Insuffisance cardiaque", "Accident vasculaire cérébral (AVC)", "Autre (saisir soi-même)"]),
+    ("ar", ["قصور القلب", "السكتة الدماغية", "أخرى (أدخلها بنفسك)"]),
+])
+def test_diagnosis_options_follow_language(client, lang, erwartet):
+    html = client.get(f"/neu?lang={lang}").get_data(as_text=True)
+    for text in erwartet:
+        assert text in html
+
+
+def test_all_dropdown_diagnoses_have_translations():
+    for d in DIAGNOSEN:
+        assert set(diagnose_uebersetzung[d]) == {"en", "fr", "ar"}, d
+
+
+def post_patient(client, **overrides):
+    data = {"name": "A", "diagnose": "Asthma", "kategorie": "Pneumologie"}
+    data.update(overrides)
+    return client.post("/hinzufuegen", data=data)
+
+
+def test_listed_diagnosis_is_saved_in_german(client, monkeypatch, fake_db):
+    gespeichert = []
+    monkeypatch.setattr(app_module, "condition_hinzufuegen",
+                        lambda pid, diagnose, kategorie: gespeichert.append(diagnose))
+    assert post_patient(client, diagnose="Schlaganfall").status_code == 200
+    assert gespeichert == ["Schlaganfall"]
+
+
+def test_other_diagnosis_uses_free_text(client, monkeypatch, fake_db):
+    gespeichert = []
+    monkeypatch.setattr(app_module, "condition_hinzufuegen",
+                        lambda pid, diagnose, kategorie: gespeichert.append(diagnose))
+    response = post_patient(client, diagnose=ANDERE, diagnose_frei="  Gicht ")
+    assert response.status_code == 200 and gespeichert == ["Gicht"]
+
+
+def test_other_without_free_text_is_rejected(client, fake_db):
+    response = post_patient(client, diagnose=ANDERE, diagnose_frei="  ")
+    assert response.status_code == 400 and fake_db == []
+    assert "Pflichtfeld" in response.get_data(as_text=True)
+
+
+def test_free_text_is_ignored_when_a_listed_diagnosis_is_chosen(client, monkeypatch, fake_db):
+    gespeichert = []
+    monkeypatch.setattr(app_module, "condition_hinzufuegen",
+                        lambda pid, diagnose, kategorie: gespeichert.append(diagnose))
+    post_patient(client, diagnose="Asthma", diagnose_frei="irgendwas")
+    assert gespeichert == ["Asthma"]
+
+
+@pytest.mark.parametrize("wert", ["", "Zauberei", "<script>"])
+def test_diagnosis_outside_list_is_rejected(client, fake_db, wert):
+    response = post_patient(client, diagnose=wert)
+    assert response.status_code == 400 and fake_db == []
+
+
+def test_diagnosis_choice_stays_after_error(client, fake_db):
+    html = post_patient(client, name="", diagnose="COPD").get_data(as_text=True)
+    assert 'value="COPD" selected' in html
+
+
+def test_free_diagnosis_is_translated_when_it_matches_the_dictionary(client, fake_home):
+    # Eigene Eingabe "hypertonie" (klein geschrieben) wird beim Anzeigen trotzdem uebersetzt
+    from translations import uebersetze_diagnose
+    assert uebersetze_diagnose("hypertonie", "fr") == "Hypertension artérielle"

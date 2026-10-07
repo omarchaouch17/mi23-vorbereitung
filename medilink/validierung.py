@@ -5,7 +5,7 @@ Die Grenzen kommen aus risk.py, damit Formular, Pruefung und Rechnung nie ausein
 import math
 
 from risk import RANGES
-from translations import KATEGORIEN
+from translations import KATEGORIEN, DIAGNOSEN, ANDERE
 
 AGE_RANGE = (30, 79)  # wie in risk.framingham(): Score nur fuer 30-79 Jahre validiert
 
@@ -72,19 +72,39 @@ def validiere_risiko(form, t):
 
 
 def validiere_patient(form, t):
-    """Prueft das Formular 'Neuer Patient'. Gibt (werte, fehler) zurueck."""
-    grenzen = {"name": 60, "diagnose": 80}
-    labels = {"name": t["neu_name"], "diagnose": t["neu_diagnose"], "kategorie": t["neu_kategorie"]}
-    fehler, werte = {}, {}
-    for feld, maximum in grenzen.items():
-        text = form.get(feld, "").strip()
-        if not text:
-            fehler[feld] = t["err_required"].format(label=labels[feld])
-        elif len(text) > maximum:
-            fehler[feld] = t["err_long"].format(label=labels[feld], max=maximum)
-        werte[feld] = text
+    """Prueft das Formular 'Neuer Patient'. Gibt (werte, fehler) zurueck.
 
-    # Kategorie ist eine feste Auswahl: nur Werte aus der Liste sind erlaubt
+    werte["diagnose"] ist der endgueltig zu speichernde Text (Auswahl oder freie Eingabe);
+    werte["diagnose_wahl"] / werte["diagnose_frei"] dienen nur zum erneuten Anzeigen des Formulars.
+    """
+    labels = {"name": t["neu_name"], "diagnose": t["neu_diagnose"],
+              "frei": t["frei_label"], "kategorie": t["neu_kategorie"]}
+    fehler, werte = {}, {}
+
+    name = form.get("name", "").strip()
+    if not name:
+        fehler["name"] = t["err_required"].format(label=labels["name"])
+    elif len(name) > 60:
+        fehler["name"] = t["err_long"].format(label=labels["name"], max=60)
+    werte["name"] = name
+
+    # Diagnose: feste Auswahl oder "Andere" + freies Textfeld
+    wahl = form.get("diagnose", "")
+    frei = form.get("diagnose_frei", "").strip()
+    werte["diagnose_wahl"], werte["diagnose_frei"], werte["diagnose"] = wahl, frei, ""
+    if wahl == ANDERE:
+        if not frei:
+            fehler["diagnose_frei"] = t["err_required"].format(label=labels["frei"])
+        elif len(frei) > 80:
+            fehler["diagnose_frei"] = t["err_long"].format(label=labels["frei"], max=80)
+        else:
+            werte["diagnose"] = frei
+    elif wahl in DIAGNOSEN:
+        werte["diagnose"] = wahl
+    else:
+        fehler["diagnose"] = t["err_choose"].format(label=labels["diagnose"])
+
+    # Kategorie: nur Werte aus der Liste sind erlaubt
     kategorie = form.get("kategorie", "")
     if kategorie not in KATEGORIEN:
         fehler["kategorie"] = t["err_choose"].format(label=labels["kategorie"])

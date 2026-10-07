@@ -13,7 +13,22 @@ diagnose_uebersetzung = {
     "Asthma": {"en": "Asthma", "fr": "Asthme", "ar": "الربو"},
     "Herzinfarkt": {"en": "Myocardial infarction", "fr": "Infarctus du myocarde", "ar": "احتشاء عضلة القلب"},
     "Krank": {"en": "Ill", "fr": "Malade", "ar": "مريض"},
+    "Schlaganfall": {"en": "Stroke", "fr": "Accident vasculaire cérébral (AVC)", "ar": "السكتة الدماغية"},
+    "COPD": {"en": "COPD", "fr": "BPCO", "ar": "مرض الانسداد الرئوي المزمن"},
+    "Pneumonie": {"en": "Pneumonia", "fr": "Pneumonie", "ar": "الالتهاب الرئوي"},
+    "Niereninsuffizienz": {"en": "Kidney failure", "fr": "Insuffisance rénale", "ar": "الفشل الكلوي"},
+    "Migräne": {"en": "Migraine", "fr": "Migraine", "ar": "الصداع النصفي"},
+    "Depression": {"en": "Depression", "fr": "Dépression", "ar": "الاكتئاب"},
 }
+
+# Auswahl im Formular "Neuer Patient" (deutscher Name wird gespeichert; "Krank" ist zu unspezifisch).
+# Alles andere ueber die Option "Andere" mit freiem Textfeld.
+DIAGNOSEN = [
+    "Hypertonie", "Herzinsuffizienz", "Herzinfarkt", "Schlaganfall", "Diabetes mellitus",
+    "Asthma", "COPD", "Pneumonie", "Niereninsuffizienz", "Migräne", "Depression",
+    "Appendizitis", "Kolonkarzinom",
+]
+ANDERE = "__andere__"   # Wert der Option "Andere (selbst eingeben)"
 
 texte = {
     "de": {
@@ -47,6 +62,8 @@ texte = {
         "err_long": "{label}: Maximal {max} Zeichen.",
         "waehlen": "Bitte wählen …",
         "err_choose": "{label}: Bitte eine Auswahl treffen.",
+        "andere": "Andere (selbst eingeben)",
+        "frei_label": "Eigene Diagnose",
     },
     "en": {
         "titel": "MediConnect", "patienten": "Patients", "diagnose": "Diagnosis",
@@ -79,6 +96,8 @@ texte = {
         "err_long": "{label}: maximum {max} characters.",
         "waehlen": "Please select …",
         "err_choose": "{label}: please make a selection.",
+        "andere": "Other (enter yourself)",
+        "frei_label": "Own diagnosis",
     },
     "fr": {
         "titel": "MédiLien", "patienten": "Patients", "diagnose": "Diagnostic",
@@ -111,6 +130,8 @@ texte = {
         "err_long": "{label} : {max} caractères maximum.",
         "waehlen": "Veuillez choisir …",
         "err_choose": "{label} : veuillez faire un choix.",
+        "andere": "Autre (saisir soi-même)",
+        "frei_label": "Diagnostic personnalisé",
     },
     "ar": {
         "titel": "رابط طبي", "patienten": "المرضى", "diagnose": "التشخيص",
@@ -143,6 +164,8 @@ texte = {
         "err_long": "{label}: الحد الأقصى {max} حرفًا.",
         "waehlen": "يرجى الاختيار …",
         "err_choose": "{label}: يرجى الاختيار من القائمة.",
+        "andere": "أخرى (أدخلها بنفسك)",
+        "frei_label": "تشخيص آخر",
     },
 }
 

@@ -45,6 +45,8 @@ texte = {
         "err_hdl": "HDL muss kleiner als das Gesamtcholesterin sein.",
         "err_sex": "Bitte ein Geschlecht auswählen.",
         "err_long": "{label}: Maximal {max} Zeichen.",
+        "waehlen": "Bitte wählen …",
+        "err_choose": "{label}: Bitte eine Auswahl treffen.",
     },
     "en": {
         "titel": "MediConnect", "patienten": "Patients", "diagnose": "Diagnosis",
@@ -75,6 +77,8 @@ texte = {
         "err_hdl": "HDL must be lower than total cholesterol.",
         "err_sex": "Please select a sex.",
         "err_long": "{label}: maximum {max} characters.",
+        "waehlen": "Please select …",
+        "err_choose": "{label}: please make a selection.",
     },
     "fr": {
         "titel": "MédiLien", "patienten": "Patients", "diagnose": "Diagnostic",
@@ -105,6 +109,8 @@ texte = {
         "err_hdl": "Le HDL doit être inférieur au cholestérol total.",
         "err_sex": "Veuillez sélectionner un sexe.",
         "err_long": "{label} : {max} caractères maximum.",
+        "waehlen": "Veuillez choisir …",
+        "err_choose": "{label} : veuillez faire un choix.",
     },
     "ar": {
         "titel": "رابط طبي", "patienten": "المرضى", "diagnose": "التشخيص",
@@ -135,8 +141,27 @@ texte = {
         "err_hdl": "يجب أن يكون HDL أقل من الكوليسترول الكلي.",
         "err_sex": "يرجى اختيار الجنس.",
         "err_long": "{label}: الحد الأقصى {max} حرفًا.",
+        "waehlen": "يرجى الاختيار …",
+        "err_choose": "{label}: يرجى الاختيار من القائمة.",
     },
 }
+
+# Auswahl fuer das Feld "Kategorie" (Fachgebiet). Gespeichert wird der deutsche Name
+# (wie bei den bisherigen Eintraegen), angezeigt wird er in der gewaehlten Sprache.
+kategorie_uebersetzung = {
+    "Kardiologie": {"de": "Kardiologie", "en": "Cardiology", "fr": "Cardiologie", "ar": "أمراض القلب"},
+    "Innere Medizin": {"de": "Innere Medizin", "en": "Internal medicine", "fr": "Médecine interne", "ar": "الطب الباطني"},
+    "Chirurgie": {"de": "Chirurgie", "en": "Surgery", "fr": "Chirurgie", "ar": "الجراحة"},
+    "Onkologie": {"de": "Onkologie", "en": "Oncology", "fr": "Oncologie", "ar": "الأورام"},
+    "Neurologie": {"de": "Neurologie", "en": "Neurology", "fr": "Neurologie", "ar": "الأعصاب"},
+    "Endokrinologie": {"de": "Endokrinologie / Diabetologie", "en": "Endocrinology / Diabetes", "fr": "Endocrinologie / Diabétologie", "ar": "الغدد الصماء والسكري"},
+    "Pneumologie": {"de": "Pneumologie", "en": "Pulmonology", "fr": "Pneumologie", "ar": "أمراض الرئة"},
+    "Gastroenterologie": {"de": "Gastroenterologie", "en": "Gastroenterology", "fr": "Gastro-entérologie", "ar": "أمراض الجهاز الهضمي"},
+    "Orthopädie": {"de": "Orthopädie", "en": "Orthopedics", "fr": "Orthopédie", "ar": "جراحة العظام"},
+    "Psychiatrie": {"de": "Psychiatrie", "en": "Psychiatry", "fr": "Psychiatrie", "ar": "الطب النفسي"},
+    "Sonstiges": {"de": "Sonstiges", "en": "Other", "fr": "Autre", "ar": "أخرى"},
+}
+KATEGORIEN = list(kategorie_uebersetzung)
 
 _diagnose_klein = {k.lower(): v for k, v in diagnose_uebersetzung.items()}
 
@@ -147,3 +172,9 @@ def uebersetze_diagnose(text, sprache):
         return text
     eintrag = _diagnose_klein.get(text.strip().lower())
     return eintrag[sprache] if eintrag else text
+
+
+def kategorie_name(schluessel, sprache):
+    """Anzeigename einer Kategorie in der Zielsprache (unbekannte Werte bleiben unveraendert)."""
+    eintrag = kategorie_uebersetzung.get(schluessel)
+    return eintrag[sprache] if eintrag else schluessel

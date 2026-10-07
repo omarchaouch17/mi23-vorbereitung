@@ -5,7 +5,8 @@
 {% if fehler %}<div class="fehler-box" role="alert">{{ t.fehler_titel }}</div>{% endif %}
 <form action="/hinzufuegen" method="POST" novalidate>
     <input type="hidden" name="lang" value="{{ lang }}">
-    {% for feld, label, maximum in [("name", t.neu_name, 60), ("diagnose", t.neu_diagnose, 80), ("kategorie", t.neu_kategorie, 60)] %}
+
+    {% for feld, label, maximum in [("name", t.neu_name, 60), ("diagnose", t.neu_diagnose, 80)] %}
     <div class="feld">
         <label for="{{ feld }}">{{ label }}</label>
         <input type="text" id="{{ feld }}" name="{{ feld }}" maxlength="{{ maximum }}"
@@ -13,6 +14,18 @@
         <div class="fehler" role="alert">{{ fehler.get(feld, '') }}</div>
     </div>
     {% endfor %}
+
+    <div class="feld">
+        <label for="kategorie">{{ t.neu_kategorie }}</label>
+        <select id="kategorie" name="kategorie" {% if fehler.get('kategorie') %}class="ungueltig"{% endif %}>
+            <option value="" disabled {% if not werte.get('kategorie') %}selected{% endif %}>{{ t.waehlen }}</option>
+            {% for k in kategorien %}
+            <option value="{{ k }}" {% if werte.get('kategorie') == k %}selected{% endif %}>{{ kategorie_name(k, lang) }}</option>
+            {% endfor %}
+        </select>
+        <div class="fehler" role="alert">{{ fehler.get('kategorie', '') }}</div>
+    </div>
+
     <button type="submit">{{ t.speichern }}</button>
 </form>
 <br>

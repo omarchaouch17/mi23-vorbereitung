@@ -7,13 +7,14 @@ from fhir_db import (
     patient_hinzufuegen, condition_hinzufuegen, patient_loeschen,
     risiko_speichern, hole_neuestes_risiko, hole_alle_risiken
 )
-from translations import texte, uebersetze_diagnose
+from translations import texte, uebersetze_diagnose, kategorie_name, KATEGORIEN
 from risk import framingham
 from validierung import (
     RISIKO_FELDER, validiere_risiko, validiere_patient
 )
 
 app = Flask(__name__)
+app.jinja_env.globals["kategorie_name"] = kategorie_name
 
 # Tabellen beim Start anlegen (wichtig fuer Render, dort gibt es keine fertige DB)
 erstelle_tabelle()
@@ -80,7 +81,7 @@ def home():
 
 @app.route("/neu")
 def neues_formular():
-    return render_template("neu.html", werte={}, fehler={})
+    return render_template("neu.html", werte={}, fehler={}, kategorien=KATEGORIEN)
 
 
 @app.route("/hinzufuegen", methods=["POST"])
@@ -89,7 +90,7 @@ def hinzufuegen():
     werte, fehler = validiere_patient(request.form, t)
     if fehler:
         return render_template("neu.html", werte=werte, fehler=fehler,
-                               sprach_pfad="/neu"), 400
+                               kategorien=KATEGORIEN, sprach_pfad="/neu"), 400
 
     patient_id = patient_hinzufuegen(werte["name"], "siehe conditions")
     condition_hinzufuegen(patient_id, werte["diagnose"], werte["kategorie"])

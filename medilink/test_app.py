@@ -4,7 +4,7 @@ import re
 import pytest
 import app as app_module
 from app import app
-from translations import texte, diagnose_uebersetzung
+from translations import texte, diagnose_uebersetzung, kategorie_uebersetzung, KATEGORIEN
 
 VALID = {"name": "Demo", "sex": "m", "alter": "55", "cholesterin": "220",
          "hdl": "50", "blutdruck": "140", "lang": "de"}
@@ -216,3 +216,52 @@ def test_decimal_comma_is_accepted(client, fake_db):
 def test_error_page_language_switch_uses_get_route(client, fake_db):
     html = post_risk(client, hdl="5").get_data(as_text=True)
     assert 'href="/risiko?lang=en"' in html
+
+
+# ---------- Kategorie: Auswahl statt Tippen ----------
+
+def test_category_is_a_dropdown_with_all_options(client):
+    html = client.get("/neu").get_data(as_text=True)
+    assert '<select id="kategorie" name="kategorie"' in html
+    assert 'type="text" id="kategorie"' not in html
+    for k in KATEGORIEN:
+        assert f'value="{k}"' in html
+
+
+@pytest.mark.parametrize("lang,erwartet", [
+    ("en", ["Cardiology", "Internal medicine", "Please select"]),
+    ("fr", ["Médecine interne", "Gastro-entérologie", "Veuillez choisir"]),
+    ("ar", ["أمراض القلب", "الطب النفسي", "يرجى الاختيار"]),
+])
+def test_category_options_follow_language(client, lang, erwartet):
+    html = client.get(f"/neu?lang={lang}").get_data(as_text=True)
+    for text in erwartet:
+        assert text in html
+    assert "Kardiologie</option>" not in html
+
+
+def test_every_category_has_all_four_languages():
+    for key, namen in kategorie_uebersetzung.items():
+        assert set(namen) == {"de", "en", "fr", "ar"}, key
+
+
+def test_valid_category_is_saved(client, monkeypatch, fake_db):
+    gespeichert = []
+    monkeypatch.setattr(app_module, "condition_hinzufuegen",
+                        lambda pid, diagnose, kategorie: gespeichert.append(kategorie))
+    client.post("/hinzufuegen", data={"name": "A", "diagnose": "Asthma", "kategorie": "Pneumologie"})
+    assert gespeichert == ["Pneumologie"]
+
+
+@pytest.mark.parametrize("wert", ["", "Zauberei", "<script>"])
+def test_category_outside_list_is_rejected(client, fake_db, wert):
+    response = client.post("/hinzufuegen", data={"name": "A", "diagnose": "Asthma", "kategorie": wert})
+    assert response.status_code == 400
+    assert fake_db == []
+    assert "Auswahl" in response.get_data(as_text=True)
+
+
+def test_selected_category_stays_after_error(client, fake_db):
+    html = client.post("/hinzufuegen", data={"name": "", "diagnose": "x",
+                                             "kategorie": "Onkologie"}).get_data(as_text=True)
+    assert 'value="Onkologie" selected' in html

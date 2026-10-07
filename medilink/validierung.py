@@ -5,6 +5,7 @@ Die Grenzen kommen aus risk.py, damit Formular, Pruefung und Rechnung nie ausein
 import math
 
 from risk import RANGES
+from translations import KATEGORIEN
 
 AGE_RANGE = (30, 79)  # wie in risk.framingham(): Score nur fuer 30-79 Jahre validiert
 
@@ -72,7 +73,7 @@ def validiere_risiko(form, t):
 
 def validiere_patient(form, t):
     """Prueft das Formular 'Neuer Patient'. Gibt (werte, fehler) zurueck."""
-    grenzen = {"name": 60, "diagnose": 80, "kategorie": 60}
+    grenzen = {"name": 60, "diagnose": 80}
     labels = {"name": t["neu_name"], "diagnose": t["neu_diagnose"], "kategorie": t["neu_kategorie"]}
     fehler, werte = {}, {}
     for feld, maximum in grenzen.items():
@@ -82,4 +83,10 @@ def validiere_patient(form, t):
         elif len(text) > maximum:
             fehler[feld] = t["err_long"].format(label=labels[feld], max=maximum)
         werte[feld] = text
+
+    # Kategorie ist eine feste Auswahl: nur Werte aus der Liste sind erlaubt
+    kategorie = form.get("kategorie", "")
+    if kategorie not in KATEGORIEN:
+        fehler["kategorie"] = t["err_choose"].format(label=labels["kategorie"])
+    werte["kategorie"] = kategorie
     return werte, fehler

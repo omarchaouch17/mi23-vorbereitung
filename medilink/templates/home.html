@@ -6,7 +6,12 @@
 </div>
 <h1>{{ titel }}</h1>
 <h2>{{ patienten_titel }}</h2>
-<p><a href="/neu">+ Neuen Patienten hinzufügen</a></p>
+<p>
+    <a href="/neu">+ Neuen Patienten hinzufügen</a>
+    &nbsp;|&nbsp;
+    <a href="/risiko?lang={{ request.args.get('lang', 'de') }}">❤ Herzrisiko berechnen</a>
+</p>
+
 
 {% for patient_id, patient in patienten.items() %}
 <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #334155; border-radius: 6px;">

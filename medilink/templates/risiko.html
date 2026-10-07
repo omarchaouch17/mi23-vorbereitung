@@ -8,6 +8,8 @@
 
 {% if fehler %}<div class="fehler-box" role="alert">{{ t.fehler_titel }}{% if fehler.allgemein %}<br>{{ fehler.allgemein }}{% endif %}</div>{% endif %}
 
+{% include "_werte_guide.html" %}
+
 {% if patienten %}
 <form action="/risiko_berechnen" method="POST" id="risiko-form" novalidate>
     <input type="hidden" name="lang" value="{{ lang }}">

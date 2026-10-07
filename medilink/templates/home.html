@@ -35,7 +35,7 @@
     #intro .gitter { position: absolute; inset: 0; opacity: 0; animation: gitter-ein 1s ease forwards;
         background-image: linear-gradient(#38bdf8 1px, transparent 1px), linear-gradient(90deg, #38bdf8 1px, transparent 1px);
         background-size: 28px 28px; }
-    #intro .wert { position: absolute; bottom: -30px; font: 600 .95rem 'Segoe UI', sans-serif; color: #38bdf8; opacity: 0;
+    #intro .wert { direction: ltr; position: absolute; bottom: -30px; font: 600 .95rem 'Segoe UI', sans-serif; color: #38bdf8; opacity: 0;
                    white-space: nowrap; animation: wert-steigen 3.4s ease-out both; text-shadow: 0 0 8px #38bdf8; }
     #intro .buehne { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     #intro .herz-wrap { transform-origin: 50% 50%; animation: durchflug .6s cubic-bezier(.6,0,1,1) 2.9s forwards; }
@@ -100,7 +100,10 @@
     <a href="/neu?lang={{ lang }}">{{ t.neuer_patient_link }}</a>
     &nbsp;|&nbsp;
     <a href="/risiko?lang={{ lang }}">{{ t.risiko_link }}</a>
+    &nbsp;|&nbsp;
+    <a href="/statistik?lang={{ lang }}">{{ t.statistik_link }}</a>
 </p>
+{% if fremde %}<p class="hinweis">{{ t.fremde_hinweis }}</p>{% endif %}
 
 {% for patient_id, patient in patienten.items() %}
 <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #334155; border-radius: 6px;">
@@ -108,6 +111,7 @@
     {% if patient.risiko %}
     <span style="color:#fbbf24;"> | {{ t.risiko_label }}: {{ patient.risiko[0] }}% ({{ patient.risiko[1] }})</span>
     {% endif %}
+{% if patient.darf %}
     <a href="/verlauf/{{ patient_id }}?lang={{ lang }}" style="color:#38bdf8;">{{ t.verlauf_link }}</a>
 
     <form action="/loeschen/{{ patient_id }}" method="POST"
@@ -120,6 +124,7 @@
         </button>
     </form>
 
+{% endif %}
     <ul style="text-align:start; margin-top:5px;">
         {% for diagnose in patient.diagnosen %}
         <li>{{ diagnose }}</li>

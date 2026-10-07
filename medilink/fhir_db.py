@@ -65,6 +65,7 @@ def patient_mit_diagnosen_anzeigen():
 def patient_loeschen(patient_id):
     verbindung = sqlite3.connect("patienten.db")
     cursor = verbindung.cursor()
+    cursor.execute("DELETE FROM risk_scores WHERE patient_id = ?", (patient_id,))
     cursor.execute("DELETE FROM conditions WHERE patient_id = ?", (patient_id,))
     cursor.execute("DELETE FROM patienten WHERE id = ?", (patient_id,))
     verbindung.commit()
@@ -132,6 +133,57 @@ def hole_alle_risiken(patient_id):
         WHERE patient_id = ?
         ORDER BY datum DESC, id DESC
     """, (patient_id,))
+    ergebnisse = cursor.fetchall()
+    verbindung.close()
+    return ergebnisse
+
+
+def erstelle_besuche_tabelle():
+    """Zaehlt Besucher ohne personenbezogene Daten: nur ein zufaelliger Token (keine IP-Adresse)."""
+    verbindung = sqlite3.connect("patienten.db")
+    verbindung.execute("""
+        CREATE TABLE IF NOT EXISTS besuche (
+            token TEXT PRIMARY KEY,
+            erster_besuch TEXT
+        )
+    """)
+    verbindung.commit()
+    verbindung.close()
+
+
+def besuch_zaehlen(token):
+    verbindung = sqlite3.connect("patienten.db")
+    verbindung.execute("INSERT OR IGNORE INTO besuche (token, erster_besuch) VALUES (?, ?)",
+                       (token, datetime.datetime.now().isoformat(timespec="seconds")))
+    verbindung.commit()
+    verbindung.close()
+
+
+def hole_statistik():
+    """Gesamtzahlen: Besucher, Patienten, Berechnungen, durchschnittliches Risiko."""
+    verbindung = sqlite3.connect("patienten.db")
+    cursor = verbindung.cursor()
+    besucher = cursor.execute("SELECT COUNT(*) FROM besuche").fetchone()[0]
+    patienten = cursor.execute("SELECT COUNT(*) FROM patienten").fetchone()[0]
+    berechnungen, durchschnitt = cursor.execute(
+        "SELECT COUNT(*), AVG(risiko_prozent) FROM risk_scores").fetchone()
+    verbindung.close()
+    return {"besucher": besucher, "patienten": patienten, "berechnungen": berechnungen,
+            "durchschnitt": round(durchschnitt, 1) if durchschnitt is not None else None}
+
+
+def hole_alle_eintraege(limit=200):
+    """Alle Berechnungen (neueste zuerst) inkl. Name - Anonymisierung passiert erst in der App."""
+    verbindung = sqlite3.connect("patienten.db")
+    cursor = verbindung.cursor()
+    cursor.execute("""
+        SELECT risk_scores.id, risk_scores.patient_id, risk_scores.datum, risk_scores.alter_wert,
+               risk_scores.cholesterin, risk_scores.hdl, risk_scores.blutdruck, risk_scores.raucher,
+               risk_scores.zigaretten_pro_tag, risk_scores.risiko_prozent, patienten.name
+        FROM risk_scores LEFT JOIN patienten ON patienten.id = risk_scores.patient_id
+        ORDER BY risk_scores.datum DESC, risk_scores.id DESC
+        LIMIT ?
+    """, (limit,))
     ergebnisse = cursor.fetchall()
     verbindung.close()
     return ergebnisse

@@ -14,7 +14,21 @@ VALID = {"patient_id": "1", "sex": "m", "alter": "55", "cholesterin": "220",
 def client():
     """A fake browser that sends requests to the app without starting a server."""
     app.config["TESTING"] = True
-    return app.test_client()
+    c = app.test_client()
+    with c.session_transaction() as sitzung:   # Standard-Testbesucher ist Admin (sieht alles)
+        sitzung["admin"] = True
+        sitzung["besucher"] = "test"
+    return c
+
+
+@pytest.fixture
+def besucher():
+    """Normaler, fremder Besucher ohne Admin-Rechte."""
+    app.config["TESTING"] = True
+    c = app.test_client()
+    with c.session_transaction() as sitzung:
+        sitzung["besucher"] = "fremd"
+    return c
 
 
 @pytest.fixture
@@ -27,6 +41,17 @@ def fake_db(monkeypatch):
                         lambda patient_id, diagnose, kategorie: None)
     monkeypatch.setattr(app_module, "risiko_speichern", lambda *args, **kwargs: None)
     return saved
+
+
+_echte_liste = app_module.hole_patienten_liste
+
+
+@pytest.fixture(autouse=True)
+def fake_besuche(monkeypatch):
+    """Besucher-Zaehler schreibt nie in die echte Datenbank."""
+    gezaehlt = []
+    monkeypatch.setattr(app_module, "besuch_zaehlen", gezaehlt.append)
+    return gezaehlt
 
 
 @pytest.fixture(autouse=True)
@@ -548,3 +573,135 @@ def test_home_has_intro_animation_with_title_in_selected_language(client, fake_h
 def test_other_pages_have_no_intro(client, fake_home):
     assert 'id="intro"' not in client.get("/risiko").get_data(as_text=True)
     assert 'id="intro"' not in client.get("/neu").get_data(as_text=True)
+
+
+# ---------- Anonymitaet, Statistik, Besucherzaehler ----------
+
+@pytest.fixture
+def alle_daten(monkeypatch):
+    """Zwei fremde Patienten + ein Eintrag; Namen sollen fuer Fremde unsichtbar bleiben."""
+    monkeypatch.setattr(app_module, "hole_patienten_mit_diagnosen",
+                        lambda: [("Geheim Gerda", "Asthma", "Pneumologie", 7), ("Eigen Egon", "Hypertonie", "Kardiologie", 8)])
+    monkeypatch.setattr(app_module, "hole_neuestes_risiko", lambda pid: (8.3, "2026-10-07"))
+    monkeypatch.setattr(app_module, "hole_alle_patienten", lambda: [(8, "Eigen Egon"), (7, "Geheim Gerda")])
+    monkeypatch.setattr(app_module, "hole_patienten_liste", _echte_liste)
+    monkeypatch.setattr(app_module, "hole_statistik",
+                        lambda: {"besucher": 12, "patienten": 2, "berechnungen": 1, "durchschnitt": 8.3})
+    monkeypatch.setattr(app_module, "hole_alle_eintraege",
+                        lambda: [(5, 7, "2026-10-07", 55, 220.0, 50.0, 140.0, 1, 15, 8.3, "Geheim Gerda")])
+
+
+def test_stranger_sees_other_patients_only_anonymous(besucher, alle_daten):
+    html = besucher.get("/").get_data(as_text=True)
+    assert "Geheim Gerda" not in html and "Eigen Egon" not in html
+    assert "Anonym #7" in html and "Anonym #8" in html
+    assert "/verlauf/7" not in html and "/loeschen/7" not in html
+
+
+def test_visitor_sees_own_patient_by_name(besucher, alle_daten):
+    with besucher.session_transaction() as s:
+        s["eigene"] = [8]
+    html = besucher.get("/").get_data(as_text=True)
+    assert "Eigen Egon" in html and "/verlauf/8" in html and "Geheim Gerda" not in html
+
+
+def test_stranger_cannot_delete_or_open_history_of_others(besucher, alle_daten, fake_delete):
+    assert besucher.post("/loeschen/7").status_code == 403 and fake_delete == []
+    assert besucher.get("/verlauf/7").status_code == 404
+
+
+def test_risk_form_lists_only_own_patients_for_strangers(besucher, alle_daten):
+    html = besucher.get("/risiko").get_data(as_text=True)
+    assert "Geheim Gerda" not in html
+    with besucher.session_transaction() as s:
+        s["eigene"] = [8]
+    assert "Eigen Egon" in besucher.get("/risiko").get_data(as_text=True)
+
+
+def test_stranger_cannot_calculate_for_foreign_patient(besucher, alle_daten, fake_risk):
+    r = besucher.post("/risiko_berechnen", data=dict(VALID, patient_id="7"))
+    assert r.status_code == 400 and fake_risk == []
+
+
+def test_new_patient_becomes_own(besucher, fake_db):
+    besucher.post("/hinzufuegen", data={"name": "A", "diagnose": "Asthma", "kategorie": "Pneumologie"})
+    with besucher.session_transaction() as s:
+        assert s["eigene"] == [99]
+
+
+def test_statistics_page_is_anonymous_for_strangers(besucher, alle_daten):
+    html = besucher.get("/statistik").get_data(as_text=True)
+    assert "Geheim Gerda" not in html and "220" not in html and "140" not in html
+    assert ">12<" in html and "8.3" in html and "Statistik (anonym)" in html
+
+
+def test_statistics_page_shows_names_and_values_to_admin(client, alle_daten):
+    html = client.get("/statistik").get_data(as_text=True)
+    assert "Geheim Gerda" in html and "220" in html and "Admin-Ansicht" in html
+
+
+def test_statistics_follows_language(besucher, alle_daten):
+    assert "Statistiques (anonymes)" in besucher.get("/statistik?lang=fr").get_data(as_text=True)
+    assert "الإحصائيات" in besucher.get("/statistik?lang=ar").get_data(as_text=True)
+
+
+def test_visit_is_counted_once_per_browser(fake_besuche, fake_home):
+    c = app.test_client()
+    c.get("/"); c.get("/neu"); c.get("/")
+    assert len(fake_besuche) == 1
+
+
+def test_admin_login_needs_correct_key(monkeypatch, alle_daten):
+    monkeypatch.setenv("ADMIN_KEY", "geheim123")
+    c = app.test_client()
+    assert c.get("/admin").status_code == 404
+    assert c.get("/admin?key=falsch").status_code == 404
+    assert c.get("/admin?key=geheim123").status_code == 302
+    assert "Geheim Gerda" in c.get("/statistik").get_data(as_text=True)
+
+
+def test_admin_disabled_without_env_key(monkeypatch):
+    monkeypatch.delenv("ADMIN_KEY", raising=False)
+    assert app.test_client().get("/admin?key=").status_code == 404
+
+
+def test_statistics_db_functions(tmp_path, monkeypatch):
+    import fhir_db
+    monkeypatch.chdir(tmp_path)
+    for f in (fhir_db.erstelle_tabelle, fhir_db.erstelle_condition_tabelle,
+              fhir_db.erstelle_risk_score_tabelle, fhir_db.erstelle_besuche_tabelle):
+        f()
+    fhir_db.besuch_zaehlen("a"); fhir_db.besuch_zaehlen("a"); fhir_db.besuch_zaehlen("b")
+    pid = fhir_db.patient_hinzufuegen("X", "y")
+    fhir_db.risiko_speichern(pid, 50, 200, 50, 120, 0, 0, 10.0)
+    fhir_db.risiko_speichern(pid, 51, 200, 50, 120, 0, 0, 20.0)
+    st = fhir_db.hole_statistik()
+    assert st == {"besucher": 2, "patienten": 1, "berechnungen": 2, "durchschnitt": 15.0}
+    assert len(fhir_db.hole_alle_eintraege()) == 2
+    fhir_db.patient_loeschen(pid)
+    assert fhir_db.hole_statistik()["berechnungen"] == 0
+
+
+# ---------- Werte-Erklaerung (Skalen) ----------
+
+def test_risk_page_has_value_guide_with_three_scales(client):
+    html = client.get("/risiko").get_data(as_text=True)
+    assert html.count('class="skala"') == 3
+    for feld in ("cholesterin", "hdl", "blutdruck"):
+        assert f'data-feld="{feld}"' in html
+    assert "Werte verstehen" in html and "Beispiel" in html
+
+
+@pytest.mark.parametrize("lang,erwartet", [
+    ("en", "Understand the values"), ("fr", "Comprendre les valeurs"), ("ar", "فهم القيم")])
+def test_value_guide_follows_language(client, lang, erwartet):
+    html = client.get(f"/risiko?lang={lang}").get_data(as_text=True)
+    assert erwartet in html and "Werte verstehen" not in html
+
+
+def test_value_guide_zone_widths_add_up_to_100(client):
+    html = client.get("/risiko").get_data(as_text=True)
+    breiten = [float(w) for w in re.findall(r'class="zone zone-\w+" style="width: ([\d.]+)%', html)]
+    assert len(breiten) == 9
+    for i in range(0, 9, 3):
+        assert abs(sum(breiten[i:i + 3]) - 100) < 0.1

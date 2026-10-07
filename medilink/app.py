@@ -1,11 +1,16 @@
+import hmac
+import os
 import sqlite3
+import uuid
+from datetime import timedelta
 
-from flask import Flask, request, render_template, redirect, url_for
+from flask import Flask, request, render_template, redirect, url_for, session, abort
 
 from fhir_db import (
     erstelle_tabelle, erstelle_condition_tabelle, erstelle_risk_score_tabelle,
     patient_hinzufuegen, condition_hinzufuegen, patient_loeschen,
-    risiko_speichern, hole_neuestes_risiko, hole_alle_risiken
+    risiko_speichern, hole_neuestes_risiko, hole_alle_risiken,
+    erstelle_besuche_tabelle, besuch_zaehlen, hole_statistik, hole_alle_eintraege
 )
 from translations import (
     texte, uebersetze_diagnose, kategorie_name, KATEGORIEN, DIAGNOSEN, ANDERE
@@ -17,6 +22,10 @@ from validierung import (
 )
 
 app = Flask(__name__)
+# Auf Render als Umgebungsvariablen setzen (SECRET_KEY, ADMIN_KEY). Ohne ADMIN_KEY gibt es keinen Admin-Zugang.
+app.secret_key = os.environ.get("SECRET_KEY", "medilink-nur-fuer-lokale-tests")
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
+                  PERMANENT_SESSION_LIFETIME=timedelta(days=365))
 app.jinja_env.globals.update(kategorie_name=kategorie_name,
                              diagnose_name=uebersetze_diagnose, ANDERE=ANDERE)
 
@@ -24,12 +33,42 @@ app.jinja_env.globals.update(kategorie_name=kategorie_name,
 erstelle_tabelle()
 erstelle_condition_tabelle()
 erstelle_risk_score_tabelle()
+erstelle_besuche_tabelle()
 
 
 def aktuelle_sprache():
     """Sprache aus ?lang=... (GET) oder verstecktem Formularfeld (POST); unbekannt -> Deutsch."""
     sprache = request.values.get("lang", "de")
     return sprache if sprache in texte else "de"
+
+
+def ist_admin():
+    return bool(session.get("admin"))
+
+
+def eigene_ids():
+    return set(session.get("eigene", []))
+
+
+def darf_sehen(patient_id):
+    """Eigene Patienten (in diesem Browser angelegt) und Admin duerfen Namen/Verlauf sehen."""
+    return ist_admin() or patient_id in eigene_ids()
+
+
+def merke_patient(patient_id):
+    eigene = session.get("eigene", [])
+    eigene.append(patient_id)
+    session["eigene"] = eigene[-200:]
+    session.permanent = True
+
+
+@app.before_request
+def besucher_zaehlen():
+    """Jeder Browser wird einmal gezaehlt - nur ueber einen Zufalls-Token, ohne IP-Adresse."""
+    if request.method == "GET" and request.endpoint not in (None, "static") and "besucher" not in session:
+        session["besucher"] = uuid.uuid4().hex
+        session.permanent = True
+        besuch_zaehlen(session["besucher"])
 
 
 @app.context_processor
@@ -73,14 +112,17 @@ def home():
             diagnose_angezeigt = uebersetze_diagnose(diagnose, sprache)
 
         if patient_id not in patienten_gruppiert:
+            darf = darf_sehen(patient_id)
             patienten_gruppiert[patient_id] = {
-                "name": name,
+                "name": name if darf else f"{t['anonym']} #{patient_id}",
+                "darf": darf,
                 "diagnosen": [],
                 "risiko": hole_neuestes_risiko(patient_id)
             }
         patienten_gruppiert[patient_id]["diagnosen"].append(diagnose_angezeigt)
 
-    return render_template("home.html", patienten=patienten_gruppiert)
+    return render_template("home.html", patienten=patienten_gruppiert,
+                           fremde=any(not p["darf"] for p in patienten_gruppiert.values()))
 
 
 @app.route("/neu")
@@ -101,17 +143,20 @@ def hinzufuegen():
     patient_id = patient_hinzufuegen(werte["name"], "siehe conditions")
     condition_hinzufuegen(patient_id, werte["diagnose"], werte["kategorie"])
 
+    merke_patient(patient_id)
     # Direkt weiter zur Score-Berechnung, der neue Patient ist schon ausgewaehlt
     return redirect(url_for("risiko_formular", patient=patient_id, neu=1, lang=aktuelle_sprache()))
 
 
 @app.route("/loeschen/<int:patient_id>", methods=["POST"])
 def loeschen(patient_id):
+    if not darf_sehen(patient_id):
+        abort(403)
     patient_loeschen(patient_id)
     return redirect(url_for("home", lang=aktuelle_sprache()))
 
 
-def hole_patienten_liste():
+def hole_alle_patienten():
     """Alle Patienten als [(id, name), ...], alphabetisch."""
     verbindung = sqlite3.connect("patienten.db")
     cursor = verbindung.cursor()
@@ -119,6 +164,11 @@ def hole_patienten_liste():
     ergebnisse = cursor.fetchall()
     verbindung.close()
     return ergebnisse
+
+
+def hole_patienten_liste():
+    """Nur Patienten, die dieser Besucher sehen darf (eigene oder alle fuer Admin)."""
+    return [(pid, name) for pid, name in hole_alle_patienten() if darf_sehen(pid)]
 
 
 def patienten_auswahl():
@@ -182,8 +232,36 @@ def risiko_berechnen():
 
 @app.route("/verlauf/<int:patient_id>")
 def verlauf(patient_id):
+    if not darf_sehen(patient_id):
+        abort(404)
     return render_template("verlauf.html", risiken=hole_alle_risiken(patient_id),
                            patient_id=patient_id)
+
+
+@app.route("/admin")
+def admin():
+    """/admin?key=... schaltet die Admin-Ansicht fuer diesen Browser frei (Schluessel = ADMIN_KEY)."""
+    erwartet = os.environ.get("ADMIN_KEY", "")
+    if not erwartet or not hmac.compare_digest(request.args.get("key", ""), erwartet):
+        abort(404)
+    session["admin"] = True
+    session.permanent = True
+    return redirect(url_for("statistik", lang=aktuelle_sprache()))
+
+
+@app.route("/statistik")
+def statistik():
+    admin_modus = ist_admin()
+    eigene = eigene_ids()
+    eintraege = []
+    for (eid, pid, datum, alter, chol, hdl, bp, raucher, zig, prozent, name) in hole_alle_eintraege():
+        eintrag = {"nr": eid, "datum": datum, "alter": alter, "prozent": prozent,
+                   "kategorie": risiko_kategorie(prozent), "eigener": pid in eigene}
+        if admin_modus:   # nur der Admin sieht Namen und Details
+            eintrag.update(name=name, chol=chol, hdl=hdl, bp=bp, raucher=raucher, zig=zig)
+        eintraege.append(eintrag)
+    return render_template("statistik.html", stat=hole_statistik(), eintraege=eintraege,
+                           admin=admin_modus)
 
 
 if __name__ == "__main__":

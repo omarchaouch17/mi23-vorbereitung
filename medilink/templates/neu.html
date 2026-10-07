@@ -1,13 +1,20 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block inhalt %}
-<h1>Neuer Patient</h1>
-<form action="/hinzufuegen" method="POST">
-    <input type="text" name="name" placeholder="Patientenname" required><br>
-    <input type="text" name="diagnose" placeholder="Diagnose" required><br>
-    <input type="text" name="kategorie" placeholder="Kategorie" required><br>
-    <button type="submit">Speichern</button>
+<h1>{{ t.neu_titel }}</h1>
+{% if fehler %}<div class="fehler-box" role="alert">{{ t.fehler_titel }}</div>{% endif %}
+<form action="/hinzufuegen" method="POST" novalidate>
+    <input type="hidden" name="lang" value="{{ lang }}">
+    {% for feld, label, maximum in [("name", t.neu_name, 60), ("diagnose", t.neu_diagnose, 80), ("kategorie", t.neu_kategorie, 60)] %}
+    <div class="feld">
+        <label for="{{ feld }}">{{ label }}</label>
+        <input type="text" id="{{ feld }}" name="{{ feld }}" maxlength="{{ maximum }}"
+               value="{{ werte.get(feld, '') }}" {% if fehler.get(feld) %}class="ungueltig"{% endif %}>
+        <div class="fehler" role="alert">{{ fehler.get(feld, '') }}</div>
+    </div>
+    {% endfor %}
+    <button type="submit">{{ t.speichern }}</button>
 </form>
 <br>
-<a href="/">Zurück zur Übersicht</a>
+<a href="/?lang={{ lang }}">{{ t.zurueck }}</a>
 {% endblock %}

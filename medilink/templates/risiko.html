@@ -1,22 +1,82 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block inhalt %}
-<h1>{{ t['risiko_titel'] }}</h1>
-<p style="color:#fbbf24; font-size:0.9em;">{{ t['risiko_hinweis'] }}</p>
-<form action="/risiko_berechnen" method="POST">
-    <input type="text" name="name" placeholder="Name" required><br>
-    <select name="sex" required>
-        <option value="m">{{ t['maennlich'] }}</option>
-        <option value="f">{{ t['weiblich'] }}</option>
-    </select><br>
-    <input type="number" name="alter" placeholder="Alter" required><br>
-    <input type="number" name="cholesterin" placeholder="Gesamtcholesterin (mg/dL)" required><br>
-    <input type="number" name="hdl" placeholder="HDL (mg/dL)" required><br>
-    <input type="number" name="blutdruck" placeholder="Systolischer Blutdruck" required><br>
-    <label><input type="checkbox" name="raucher"> Raucher</label><br>
-    <label><input type="checkbox" name="behandelt"> Blutdruckbehandlung</label><br>
-    <button type="submit">{{ t['berechnen'] }}</button>
+<h1>{{ t.risiko_titel }}</h1>
+<p style="color:#fbbf24; font-size:0.9em;">{{ t.risiko_hinweis }}</p>
+
+{% if fehler %}<div class="fehler-box" role="alert">{{ t.fehler_titel }}{% if fehler.allgemein %}<br>{{ fehler.allgemein }}{% endif %}</div>{% endif %}
+
+<form action="/risiko_berechnen" method="POST" id="risiko-form" novalidate>
+    <input type="hidden" name="lang" value="{{ lang }}">
+
+    <div class="feld">
+        <label for="name">{{ t.name }}</label>
+        <input type="text" id="name" name="name" maxlength="60" value="{{ werte.get('name', '') }}"
+               {% if fehler.get('name') %}class="ungueltig"{% endif %}>
+        <div class="fehler" role="alert">{{ fehler.get('name', '') }}</div>
+    </div>
+
+    <div class="feld">
+        <label for="sex">{{ t.geschlecht }}</label>
+        <select id="sex" name="sex" {% if fehler.get('sex') %}class="ungueltig"{% endif %}>
+            <option value="m" {% if werte.get('sex') == 'm' %}selected{% endif %}>{{ t.maennlich }}</option>
+            <option value="f" {% if werte.get('sex') == 'f' %}selected{% endif %}>{{ t.weiblich }}</option>
+        </select>
+        <div class="fehler" role="alert">{{ fehler.get('sex', '') }}</div>
+    </div>
+
+    {% for feld, (label_key, (low, high), nur_ganz, einheit) in felder.items() %}
+    <div class="feld">
+        <label for="{{ feld }}">{{ t[label_key] }}{% if einheit %} ({{ einheit }}){% endif %}</label>
+        <input type="number" id="{{ feld }}" name="{{ feld }}" min="{{ low }}" max="{{ high }}"
+               step="{{ 1 if nur_ganz else 'any' }}" inputmode="decimal" data-label="{{ t[label_key] }}"
+               value="{{ werte.get(feld, '') }}" {% if fehler.get(feld) %}class="ungueltig"{% endif %}>
+        <small class="hinweis">{{ t.bereich }}: <bdi dir="ltr">{{ low }}–{{ high }}{% if einheit %} {{ einheit }}{% endif %}</bdi></small>
+        <div class="fehler" id="fehler-{{ feld }}" role="alert">{{ fehler.get(feld, '') }}</div>
+    </div>
+    {% endfor %}
+
+    <label class="check"><input type="checkbox" name="raucher" {% if 'raucher' in werte %}checked{% endif %}> {{ t.raucher }}</label>
+    <label class="check"><input type="checkbox" name="behandelt" {% if 'behandelt' in werte %}checked{% endif %}> {{ t.behandelt }}</label>
+    <br>
+    <button type="submit">{{ t.berechnen }}</button>
 </form>
 <br>
-<a href="/">Zurück zur Übersicht</a>
+<a href="/?lang={{ lang }}">{{ t.zurueck }}</a>
+
+<script>
+// Sofort-Pruefung im Browser (gleiche Regeln wie auf dem Server, Meldungen in der gewaehlten Sprache).
+// Der Server prueft immer nochmal - diese Pruefung ist nur Komfort.
+(function () {
+    var M = {{ {"required": t.err_required, "number": t.err_number, "range": t.err_range, "hdl": t.err_hdl}|tojson }};
+    var form = document.getElementById('risiko-form');
+    function fmt(s, o) { return s.replace(/\{(\w+)\}/g, function (_, k) { return o[k]; }); }
+    function zeige(el, msg) {
+        var box = document.getElementById('fehler-' + el.id);
+        if (box) { box.textContent = msg; }
+        el.classList.toggle('ungueltig', msg !== '');
+    }
+    function pruefe(el) {
+        var v = el.value.trim().replace(',', '.'), label = el.dataset.label, msg = '';
+        var lo = Number(el.min), hi = Number(el.max);
+        if (v === '') { msg = fmt(M.required, { label: label }); }
+        else if (!isFinite(Number(v)) || (el.step === '1' && !Number.isInteger(Number(v)))) { msg = fmt(M.number, { label: label }); }
+        else if (Number(v) < lo || Number(v) > hi) { msg = fmt(M.range, { label: label, low: lo, high: hi }); }
+        zeige(el, msg);
+        return msg === '';
+    }
+    var felder = form.querySelectorAll('input[type=number]');
+    felder.forEach(function (el) {
+        el.addEventListener('blur', function () { if (el.value !== '') { pruefe(el); } });
+        el.addEventListener('input', function () { zeige(el, ''); });
+    });
+    form.addEventListener('submit', function (e) {
+        var ok = true;
+        felder.forEach(function (el) { if (!pruefe(el)) { ok = false; } });
+        var chol = form.elements['cholesterin'], hdl = form.elements['hdl'];
+        if (ok && Number(hdl.value) >= Number(chol.value)) { zeige(hdl, M.hdl); ok = false; }
+        if (!ok) { e.preventDefault(); }
+    });
+})();
+</script>
 {% endblock %}

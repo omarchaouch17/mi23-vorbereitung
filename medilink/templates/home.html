@@ -1,36 +1,33 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block inhalt %}
-<div class="lang-switch">
-    <a href="/?lang=de">DE</a> | <a href="/?lang=en">EN</a> | <a href="/?lang=fr">FR</a> | <a href="/?lang=ar">AR</a>
-</div>
-<h1>{{ titel }}</h1>
-<h2>{{ patienten_titel }}</h2>
+<h1>{{ t.titel }}</h1>
+<h2>{{ t.patienten }}</h2>
 <p>
-    <a href="/neu">+ Neuen Patienten hinzufügen</a>
+    <a href="/neu?lang={{ lang }}">{{ t.neuer_patient_link }}</a>
     &nbsp;|&nbsp;
-    <a href="/risiko?lang={{ request.args.get('lang', 'de') }}">❤ Herzrisiko berechnen</a>
+    <a href="/risiko?lang={{ lang }}">{{ t.risiko_link }}</a>
 </p>
-
 
 {% for patient_id, patient in patienten.items() %}
 <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #334155; border-radius: 6px;">
     <strong>{{ patient.name }}</strong>
     {% if patient.risiko %}
-    <span style="color:#fbbf24;"> | Risiko: {{ patient.risiko[0] }}% ({{ patient.risiko[1] }})</span>
+    <span style="color:#fbbf24;"> | {{ t.risiko_label }}: {{ patient.risiko[0] }}% ({{ patient.risiko[1] }})</span>
     {% endif %}
-    <a href="/verlauf/{{ patient_id }}" style="color:#38bdf8;">[Verlauf]</a>
+    <a href="/verlauf/{{ patient_id }}?lang={{ lang }}" style="color:#38bdf8;">{{ t.verlauf_link }}</a>
 
     <form action="/loeschen/{{ patient_id }}" method="POST"
-          style="display:inline; float:right;"
-          onsubmit="return confirm('Patient wirklich löschen?');">
+          style="display:inline; float:inline-end;"
+          onsubmit='return confirm({{ t.loeschen_frage|tojson }});'>
+        <input type="hidden" name="lang" value="{{ lang }}">
         <button type="submit"
-                style="background:none; border:none; color:#f87171; cursor:pointer; font-size:inherit; padding:0; text-decoration:underline;">
-            [löschen]
+                style="background:none; border:none; color:#f87171; cursor:pointer; font-size:inherit; padding:0; margin:0; text-decoration:underline;">
+            {{ t.loeschen }}
         </button>
     </form>
 
-    <ul style="text-align:left; margin-top:5px;">
+    <ul style="text-align:start; margin-top:5px;">
         {% for diagnose in patient.diagnosen %}
         <li>{{ diagnose }}</li>
         {% endfor %}

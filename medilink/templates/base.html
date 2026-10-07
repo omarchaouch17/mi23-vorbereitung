@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html dir="{{ richtung }}">
+<html lang="{{ lang }}" dir="{{ richtung }}">
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ titel }}</title>
     <style>
         html,
@@ -27,7 +28,8 @@
             color: #94a3b8;
         }
 
-        input {
+        input,
+        select {
             padding: 8px;
             margin: 5px;
             border-radius: 4px;
@@ -41,10 +43,78 @@
             border-radius: 4px;
             cursor: pointer;
         }
+
+        .lang-switch a.aktiv {
+            color: #38bdf8;
+            font-weight: bold;
+        }
+
+        /* Formulare: Label, Feld, Bereichs-Hinweis und rote Fehlermeldung */
+        .feld {
+            margin: 12px auto;
+            width: min(320px, 90%);
+            text-align: start;
+        }
+
+        .feld label {
+            display: block;
+            font-size: 0.9em;
+            margin-bottom: 2px;
+        }
+
+        .feld input[type=text],
+        .feld input[type=number],
+        .feld select {
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0;
+        }
+
+        .hinweis {
+            display: block;
+            color: #94a3b8;
+            font-size: 0.8em;
+            margin-top: 2px;
+        }
+
+        .fehler {
+            color: #f87171;
+            font-size: 0.85em;
+            min-height: 1.2em;
+            margin-top: 2px;
+        }
+
+        .ungueltig {
+            outline: 2px solid #f87171;
+        }
+
+        .fehler-box {
+            background: #450a0a;
+            border: 1px solid #f87171;
+            color: #fecaca;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin: 10px auto;
+            width: min(320px, 90%);
+        }
+
+        .check {
+            display: block;
+            margin: 6px auto;
+            width: min(320px, 90%);
+            text-align: start;
+        }
     </style>
 </head>
 
 <body>
+    {% if zeige_sprachen %}
+    <div class="lang-switch">
+        {% for code in sprachen %}
+        <a href="{{ sprach_pfad }}?lang={{ code }}" {% if code == lang %}class="aktiv" {% endif %}>{{ code|upper }}</a>{% if not loop.last %} | {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
     {% block inhalt %}{% endblock %}
 </body>
 

@@ -6,7 +6,7 @@ import app as app_module
 from app import app
 from translations import texte, diagnose_uebersetzung, kategorie_uebersetzung, KATEGORIEN, DIAGNOSEN, ANDERE
 
-VALID = {"name": "Demo", "sex": "m", "alter": "55", "cholesterin": "220",
+VALID = {"patient_id": "1", "sex": "m", "alter": "55", "cholesterin": "220",
          "hdl": "50", "blutdruck": "140", "lang": "de"}
 
 
@@ -27,6 +27,21 @@ def fake_db(monkeypatch):
                         lambda patient_id, diagnose, kategorie: None)
     monkeypatch.setattr(app_module, "risiko_speichern", lambda *args: None)
     return saved
+
+
+@pytest.fixture(autouse=True)
+def fake_patienten(monkeypatch):
+    """Vorhandene Patienten fuer die Auswahlliste im Risiko-Formular (nie die echte Datenbank)."""
+    monkeypatch.setattr(app_module, "hole_patienten_liste", lambda: [(2, "Anna"), (1, "Demo")])
+
+
+@pytest.fixture
+def fake_risk(monkeypatch):
+    """Merkt sich, zu welchen Patienten ein Score gespeichert wird."""
+    gespeichert = []
+    monkeypatch.setattr(app_module, "risiko_speichern",
+                        lambda patient_id, *args: gespeichert.append(patient_id))
+    return gespeichert
 
 
 @pytest.fixture
@@ -160,14 +175,14 @@ def post_risk(client, **overrides):
     return client.post("/risiko_berechnen", data=data)
 
 
-def test_valid_input_saves_once_and_shows_result(client, fake_db):
+def test_valid_input_saves_once_and_shows_result(client, fake_risk):
     response = post_risk(client)
     assert response.status_code == 200
     assert re.search(r"Risiko berechnet: \d+\.\d%", response.get_data(as_text=True))
-    assert fake_db == ["Demo"]
+    assert fake_risk == [1]   # Score gehoert zum gewaehlten Patienten 1
 
 
-def test_result_is_in_selected_language(client, fake_db):
+def test_result_is_in_selected_language(client, fake_risk):
     html = post_risk(client, lang="fr").get_data(as_text=True)
     assert "Risque calculé" in html and "Risiko berechnet" not in html
 
@@ -176,44 +191,46 @@ def test_result_is_in_selected_language(client, fake_db):
     ("hdl", "5"), ("hdl", "150"), ("cholesterin", "50"), ("cholesterin", "900"),
     ("blutdruck", "300"), ("blutdruck", "20"), ("alter", "20"), ("alter", "95"),
 ])
-def test_out_of_range_is_rejected_and_nothing_is_saved(client, fake_db, feld, wert):
+def test_out_of_range_is_rejected_and_nothing_is_saved(client, fake_risk, feld, wert):
     response = post_risk(client, **{feld: wert})
     assert response.status_code == 400
-    assert fake_db == []                      # kein Patient ohne Score
+    assert fake_risk == []                      # kein Patient ohne Score
     html = response.get_data(as_text=True)
     assert 'class="fehler"' in html and "muss zwischen" in html
     assert f'value="{wert}"' in html          # Eingabe bleibt erhalten
 
 
-def test_error_message_is_in_selected_language(client, fake_db):
+def test_error_message_is_in_selected_language(client, fake_risk):
     html = post_risk(client, hdl="5", lang="fr").get_data(as_text=True)
     assert "doit être compris entre 20 et 100" in html
     html = post_risk(client, hdl="5", lang="ar").get_data(as_text=True)
     assert "بين 20 و100" in html
 
 
-def test_empty_and_non_numeric_fields_rejected(client, fake_db):
+def test_empty_and_non_numeric_fields_rejected(client, fake_risk):
     assert post_risk(client, hdl="").status_code == 400
     assert post_risk(client, hdl="abc").status_code == 400
     assert post_risk(client, hdl="nan").status_code == 400
     assert post_risk(client, alter="55.5").status_code == 400
-    assert post_risk(client, name="   ").status_code == 400
+    assert post_risk(client, patient_id="").status_code == 400
+    assert post_risk(client, patient_id="999").status_code == 400   # gibt es nicht
+    assert post_risk(client, patient_id="abc").status_code == 400
     assert post_risk(client, sex="x").status_code == 400
-    assert fake_db == []
+    assert fake_risk == []
 
 
-def test_hdl_must_be_lower_than_total_cholesterol(client, fake_db):
+def test_hdl_must_be_lower_than_total_cholesterol(client, fake_risk):
     response = post_risk(client, cholesterin="100", hdl="100")   # beide im Bereich, aber unlogisch
     assert response.status_code == 400
     assert "HDL muss kleiner" in response.get_data(as_text=True)
-    assert fake_db == []
+    assert fake_risk == []
 
 
-def test_decimal_comma_is_accepted(client, fake_db):
+def test_decimal_comma_is_accepted(client, fake_risk):
     assert post_risk(client, cholesterin="220,5").status_code == 200
 
 
-def test_error_page_language_switch_uses_get_route(client, fake_db):
+def test_error_page_language_switch_uses_get_route(client, fake_risk):
     html = post_risk(client, hdl="5").get_data(as_text=True)
     assert 'href="/risiko?lang=en"' in html
 
@@ -344,3 +361,57 @@ def test_free_diagnosis_is_translated_when_it_matches_the_dictionary(client, fak
     # Eigene Eingabe "hypertonie" (klein geschrieben) wird beim Anzeigen trotzdem uebersetzt
     from translations import uebersetze_diagnose
     assert uebersetze_diagnose("hypertonie", "fr") == "Hypertension artérielle"
+
+
+# ---------- Risiko-Formular: Patient aus der Liste waehlen ----------
+
+def test_patient_is_a_dropdown_with_existing_names(client):
+    html = client.get("/risiko").get_data(as_text=True)
+    assert '<select id="patient_id" name="patient_id"' in html
+    assert 'name="name"' not in html and 'id="name"' not in html     # kein Tippfeld mehr
+    assert ">Anna</option>" in html and ">Demo</option>" in html
+    assert html.index(">Anna<") < html.index(">Demo<")
+
+
+def test_patient_can_be_preselected_by_link(client):
+    html = client.get("/risiko?patient=1").get_data(as_text=True)
+    assert 'value="1" selected' in html
+
+
+def test_duplicate_names_get_an_id_suffix(client, monkeypatch):
+    monkeypatch.setattr(app_module, "hole_patienten_liste", lambda: [(1, "Omar"), (3, "Omar"), (2, "Anna")])
+    html = client.get("/risiko").get_data(as_text=True)
+    assert "Omar (#1)" in html and "Omar (#3)" in html and ">Anna</option>" in html
+
+
+def test_without_patients_the_form_asks_to_add_one_first(client, monkeypatch):
+    monkeypatch.setattr(app_module, "hole_patienten_liste", lambda: [])
+    html = client.get("/risiko?lang=fr").get_data(as_text=True)
+    assert "Aucun patient pour l'instant" in html or "Aucun patient pour l&#39;instant" in html
+    assert 'id="risiko-form"' not in html and "/neu?lang=fr" in html
+
+
+def test_score_is_saved_for_chosen_patient_and_no_new_patient_is_created(client, fake_risk, monkeypatch):
+    angelegt = []
+    monkeypatch.setattr(app_module, "patient_hinzufuegen", lambda n, d: angelegt.append(n) or 99)
+    response = post_risk(client, patient_id="2")
+    assert response.status_code == 200 and fake_risk == [2] and angelegt == []
+    assert "Anna: Risiko berechnet" in response.get_data(as_text=True)
+
+
+def test_patient_label_follows_language(client):
+    assert "المريض" in client.get("/risiko?lang=ar").get_data(as_text=True)
+    assert "Veuillez choisir" in client.get("/risiko?lang=fr").get_data(as_text=True)
+
+
+# ---------- Mehrere Scores am selben Tag: der zuletzt gespeicherte gilt als neuester ----------
+
+def test_newest_risk_wins_when_two_scores_are_saved_on_the_same_day(tmp_path, monkeypatch):
+    import fhir_db
+    monkeypatch.chdir(tmp_path)                       # eigene Test-Datenbank, nicht die echte
+    fhir_db.erstelle_tabelle(); fhir_db.erstelle_risk_score_tabelle()
+    pid = fhir_db.patient_hinzufuegen("Test", "x")
+    fhir_db.risiko_speichern(pid, 55, 220, 50, 140, 0, 0, 8.3)
+    fhir_db.risiko_speichern(pid, 56, 230, 50, 140, 0, 0, 9.4)
+    assert fhir_db.hole_neuestes_risiko(pid)[0] == 9.4
+    assert [r[0] for r in fhir_db.hole_alle_risiken(pid)] == [9.4, 8.3]

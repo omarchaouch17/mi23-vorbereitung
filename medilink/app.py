@@ -110,25 +110,44 @@ def loeschen(patient_id):
     return redirect(url_for("home", lang=aktuelle_sprache()))
 
 
+def hole_patienten_liste():
+    """Alle Patienten als [(id, name), ...], alphabetisch."""
+    verbindung = sqlite3.connect("patienten.db")
+    cursor = verbindung.cursor()
+    cursor.execute("SELECT id, name FROM patienten ORDER BY name COLLATE NOCASE, id")
+    ergebnisse = cursor.fetchall()
+    verbindung.close()
+    return ergebnisse
+
+
+def patienten_auswahl():
+    """Eintraege fuer die Auswahlliste; bei gleichen Namen wird die ID angehaengt."""
+    liste = hole_patienten_liste()
+    haeufigkeit = {}
+    for _, name in liste:
+        haeufigkeit[name] = haeufigkeit.get(name, 0) + 1
+    return [(pid, f"{name} (#{pid})" if haeufigkeit[name] > 1 else name) for pid, name in liste]
+
+
 def _risiko_seite(werte, fehler, status=200):
     """Rendert das Risiko-Formular (leer oder mit Eingaben + roten Meldungen)."""
-    return render_template("risiko.html", werte=werte, fehler=fehler,
-                           felder=RISIKO_FELDER, sprach_pfad="/risiko"), status
+    return render_template("risiko.html", werte=werte, fehler=fehler, felder=RISIKO_FELDER,
+                           patienten=patienten_auswahl(), sprach_pfad="/risiko"), status
 
 
 @app.route("/risiko")
 def risiko_formular():
-    return _risiko_seite({}, {})
+    # /risiko?patient=3 waehlt den Patienten schon vor
+    return _risiko_seite({"patient_id": request.args.get("patient", "")}, {})
 
 
 @app.route("/risiko_berechnen", methods=["POST"])
 def risiko_berechnen():
     t = texte[aktuelle_sprache()]
-    werte, fehler = validiere_risiko(request.form, t)
+    werte, fehler = validiere_risiko(request.form, t, hole_patienten_liste())
     if fehler:
         return _risiko_seite(request.form, fehler, 400)
 
-    # ERST rechnen, DANN speichern: so entsteht nie ein Patient ohne Score
     try:
         risiko_prozent = framingham(
             werte["sex"], werte["alter"], werte["cholesterin"], werte["hdl"],
@@ -137,12 +156,12 @@ def risiko_berechnen():
     except ValueError as e:  # Sicherheitsnetz, falls risk.py strenger wird als validierung.py
         return _risiko_seite(request.form, {"allgemein": str(e)}, 400)
 
-    patient_id = patient_hinzufuegen(werte["name"], "siehe conditions")
-    risiko_speichern(patient_id, werte["alter"], werte["cholesterin"], werte["hdl"],
+    # Der Score gehoert zum gewaehlten, bereits vorhandenen Patienten (kein neuer Patient mehr)
+    risiko_speichern(werte["patient_id"], werte["alter"], werte["cholesterin"], werte["hdl"],
                      werte["blutdruck"], werte["raucher"], werte["behandelt"], risiko_prozent)
 
     return render_template("bestaetigung.html",
-                           nachricht=t["ergebnis"].format(p=risiko_prozent),
+                           nachricht=f"{werte['name']}: " + t["ergebnis"].format(p=risiko_prozent),
                            zeige_sprachen=False)
 
 

@@ -1,4 +1,4 @@
-﻿import datetime
+import datetime
 import sqlite3
 
 def erstelle_tabelle():
@@ -99,7 +99,7 @@ def hole_neuestes_risiko(patient_id):
         SELECT risiko_prozent, datum
         FROM risk_scores
         WHERE patient_id = ?
-        ORDER BY datum DESC
+        ORDER BY datum DESC, id DESC
         LIMIT 1
     """, (patient_id,))
     ergebnis = cursor.fetchone()
@@ -124,7 +124,7 @@ def hole_alle_risiken(patient_id):
         SELECT risiko_prozent, datum
         FROM risk_scores
         WHERE patient_id = ?
-        ORDER BY datum DESC
+        ORDER BY datum DESC, id DESC
     """, (patient_id,))
     ergebnisse = cursor.fetchall()
     verbindung.close()

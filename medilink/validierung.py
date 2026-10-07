@@ -27,20 +27,25 @@ def _zahl(text):
     return wert if math.isfinite(wert) else None
 
 
-def validiere_risiko(form, t):
+def validiere_risiko(form, t, patienten):
     """Prueft das Risiko-Formular. Gibt (werte, fehler) zurueck.
+
+    patienten - Liste (id, name) der vorhandenen Patienten; nur diese duerfen gewaehlt werden.
 
     werte  - bereinigte Eingaben (nur wenn fehler leer ist verwendbar)
     fehler - {feldname: Meldung in der Sprache von t}
     """
     fehler, werte = {}, {}
 
-    name = form.get("name", "").strip()
-    if not name:
-        fehler["name"] = t["err_required"].format(label=t["name"])
-    elif len(name) > 60:
-        fehler["name"] = t["err_long"].format(label=t["name"], max=60)
-    werte["name"] = name
+    namen = dict(patienten)
+    try:
+        patient_id = int(form.get("patient_id", ""))
+    except ValueError:
+        patient_id = None
+    if patient_id in namen:
+        werte["patient_id"], werte["name"] = patient_id, namen[patient_id]
+    else:
+        fehler["patient_id"] = t["err_choose"].format(label=t["patient"])
 
     sex = form.get("sex", "")
     if sex not in ("m", "f"):

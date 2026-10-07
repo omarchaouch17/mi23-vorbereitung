@@ -6,14 +6,19 @@
 
 {% if fehler %}<div class="fehler-box" role="alert">{{ t.fehler_titel }}{% if fehler.allgemein %}<br>{{ fehler.allgemein }}{% endif %}</div>{% endif %}
 
+{% if patienten %}
 <form action="/risiko_berechnen" method="POST" id="risiko-form" novalidate>
     <input type="hidden" name="lang" value="{{ lang }}">
 
     <div class="feld">
-        <label for="name">{{ t.name }}</label>
-        <input type="text" id="name" name="name" maxlength="60" value="{{ werte.get('name', '') }}"
-               {% if fehler.get('name') %}class="ungueltig"{% endif %}>
-        <div class="fehler" role="alert">{{ fehler.get('name', '') }}</div>
+        <label for="patient_id">{{ t.patient }}</label>
+        <select id="patient_id" name="patient_id" {% if fehler.get('patient_id') %}class="ungueltig"{% endif %}>
+            <option value="" disabled {% if not werte.get('patient_id') %}selected{% endif %}>{{ t.waehlen }}</option>
+            {% for pid, label in patienten %}
+            <option value="{{ pid }}" {% if werte.get('patient_id')|string == pid|string %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <div class="fehler" id="fehler-patient_id" role="alert">{{ fehler.get('patient_id', '') }}</div>
     </div>
 
     <div class="feld">
@@ -41,14 +46,19 @@
     <br>
     <button type="submit">{{ t.berechnen }}</button>
 </form>
+{% else %}
+<p style="color:#fbbf24;">{{ t.kein_patient }}</p>
+<p><a href="/neu?lang={{ lang }}">{{ t.neuer_patient_link }}</a></p>
+{% endif %}
 <br>
 <a href="/?lang={{ lang }}">{{ t.zurueck }}</a>
 
+{% if patienten %}
 <script>
 // Sofort-Pruefung im Browser (gleiche Regeln wie auf dem Server, Meldungen in der gewaehlten Sprache).
 // Der Server prueft immer nochmal - diese Pruefung ist nur Komfort.
 (function () {
-    var M = {{ {"required": t.err_required, "number": t.err_number, "range": t.err_range, "hdl": t.err_hdl}|tojson }};
+    var M = {{ {"required": t.err_required, "number": t.err_number, "range": t.err_range, "hdl": t.err_hdl, "choose": t.err_choose}|tojson }};
     var form = document.getElementById('risiko-form');
     function fmt(s, o) { return s.replace(/\{(\w+)\}/g, function (_, k) { return o[k]; }); }
     function zeige(el, msg) {
@@ -72,6 +82,9 @@
     });
     form.addEventListener('submit', function (e) {
         var ok = true;
+        var wahl = form.elements['patient_id'];
+        if (wahl.value === '') { zeige(wahl, fmt(M.choose, { label: {{ t.patient|tojson }} })); ok = false; }
+        else { zeige(wahl, ''); }
         felder.forEach(function (el) { if (!pruefe(el)) { ok = false; } });
         var chol = form.elements['cholesterin'], hdl = form.elements['hdl'];
         if (ok && Number(hdl.value) >= Number(chol.value)) { zeige(hdl, M.hdl); ok = false; }
@@ -79,4 +92,5 @@
     });
 })();
 </script>
+{% endif %}
 {% endblock %}

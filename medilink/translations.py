@@ -64,6 +64,8 @@ texte = {
         "err_choose": "{label}: Bitte eine Auswahl treffen.",
         "andere": "Andere (selbst eingeben)",
         "frei_label": "Eigene Diagnose",
+        "patient": "Patient",
+        "kein_patient": "Noch keine Patienten vorhanden. Bitte zuerst einen Patienten anlegen.",
     },
     "en": {
         "titel": "MediConnect", "patienten": "Patients", "diagnose": "Diagnosis",
@@ -98,6 +100,8 @@ texte = {
         "err_choose": "{label}: please make a selection.",
         "andere": "Other (enter yourself)",
         "frei_label": "Own diagnosis",
+        "patient": "Patient",
+        "kein_patient": "No patients yet. Please add a patient first.",
     },
     "fr": {
         "titel": "MédiLien", "patienten": "Patients", "diagnose": "Diagnostic",
@@ -132,6 +136,8 @@ texte = {
         "err_choose": "{label} : veuillez faire un choix.",
         "andere": "Autre (saisir soi-même)",
         "frei_label": "Diagnostic personnalisé",
+        "patient": "Patient",
+        "kein_patient": "Aucun patient pour l'instant. Veuillez d'abord ajouter un patient.",
     },
     "ar": {
         "titel": "رابط طبي", "patienten": "المرضى", "diagnose": "التشخيص",
@@ -166,6 +172,8 @@ texte = {
         "err_choose": "{label}: يرجى الاختيار من القائمة.",
         "andere": "أخرى (أدخلها بنفسك)",
         "frei_label": "تشخيص آخر",
+        "patient": "المريض",
+        "kein_patient": "لا يوجد مرضى بعد. يرجى إضافة مريض أولاً.",
     },
 }
 

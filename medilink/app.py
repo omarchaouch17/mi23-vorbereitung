@@ -1,4 +1,4 @@
-import sqlite3
+﻿import sqlite3
 
 from flask import Flask, request, render_template, redirect
 
@@ -60,3 +60,82 @@ def home():
         "home.html",
         titel=t["titel"],
         patienten_titel=t["patienten"],
+        patienten=patienten_gruppiert,
+        richtung=richtung
+    )
+
+
+@app.route("/neu")
+def neues_formular():
+    return render_template("neu.html", titel="MediLink", richtung="ltr")
+
+
+@app.route("/hinzufuegen", methods=["POST"])
+def hinzufuegen():
+    name = request.form["name"]
+    diagnose = request.form["diagnose"]
+    kategorie = request.form["kategorie"]
+
+    patient_id = patient_hinzufuegen(name, "siehe conditions")
+    condition_hinzufuegen(patient_id, diagnose, kategorie)
+
+    return render_template(
+        "bestaetigung.html",
+        titel="MediLink",
+        richtung="ltr",
+        nachricht="Patient erfolgreich gespeichert."
+    )
+
+
+@app.route("/loeschen/<int:patient_id>", methods=["POST"])
+def loeschen(patient_id):
+    patient_loeschen(patient_id)
+    return redirect("/")
+
+
+@app.route("/risiko")
+def risiko_formular():
+    sprache = request.args.get("lang", "de")
+    t = texte[sprache]
+    richtung = "rtl" if sprache == "ar" else "ltr"
+    return render_template("risiko.html", titel=t["titel"], richtung=richtung, t=t)
+
+
+@app.route("/risiko_berechnen", methods=["POST"])
+def risiko_berechnen():
+    name = request.form["name"]
+    sex = request.form["sex"]
+    alter = int(request.form["alter"])
+    cholesterin = float(request.form["cholesterin"])
+    hdl = float(request.form["hdl"])
+    blutdruck = float(request.form["blutdruck"])
+    raucher = "raucher" in request.form
+    behandelt = "behandelt" in request.form
+
+    patient_id = patient_hinzufuegen(name, "siehe conditions")
+    risiko_prozent = framingham(sex, alter, cholesterin, hdl, blutdruck, behandelt, raucher)
+    risiko_speichern(patient_id, alter, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent)
+
+    return render_template(
+        "bestaetigung.html",
+        titel="MediLink",
+        richtung="ltr",
+        nachricht=f"Risiko berechnet: {risiko_prozent}% (10-Jahres-Risiko). "
+                  "Dies ist eine Abschätzung, kein Diagnoseinstrument."
+    )
+
+
+@app.route("/verlauf/<int:patient_id>")
+def verlauf(patient_id):
+    risiken = hole_alle_risiken(patient_id)
+    return render_template(
+        "verlauf.html",
+        titel="MediLink",
+        richtung="ltr",
+        risiken=risiken,
+        patient_id=patient_id
+    )
+
+
+if __name__ == "__main__":
+    app.run(debug=True)

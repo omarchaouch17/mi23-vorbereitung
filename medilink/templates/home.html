@@ -15,18 +15,21 @@
     <span style="color:#fbbf24;"> | Risiko: {{ patient.risiko[0] }}% ({{ patient.risiko[1] }})</span>
     {% endif %}
     <a href="/verlauf/{{ patient_id }}" style="color:#38bdf8;">[Verlauf]</a>
-    <form action="/loeschen/{{ patient_id }}" method="POST" style="display:inline; float:right;"
-      onsubmit="return confirm('Patient wirklich löschen?');">
-    <button type="submit"
-            style="background:none; border:none; color:#f87171; cursor:pointer; font-size:inherit; padding:0; text-decoration:underline;">
-        [löschen]
-    </button>
+
+    <form action="/loeschen/{{ patient_id }}" method="POST"
+          style="display:inline; float:right;"
+          onsubmit="return confirm('Patient wirklich löschen?');">
+        <button type="submit"
+                style="background:none; border:none; color:#f87171; cursor:pointer; font-size:inherit; padding:0; text-decoration:underline;">
+            [löschen]
+        </button>
     </form>
-        <ul style="text-align:left; margin-top:5px;">
-            {% for diagnose in patient.diagnosen %}
-            <li>{{ diagnose }}</li>
-            {% endfor %}
-        </ul>
-    </div>
+
+    <ul style="text-align:left; margin-top:5px;">
+        {% for diagnose in patient.diagnosen %}
+        <li>{{ diagnose }}</li>
+        {% endfor %}
+    </ul>
+</div>
 {% endfor %}
 {% endblock %}

@@ -2,6 +2,7 @@
 
 {% block inhalt %}
 <h1>{{ nachricht }}</h1>
+{% if rauchzeile %}<p>{{ rauchzeile }}</p>{% endif %}
 
 {% if tipps %}
 <p class="kat kat-{{ kategorie }}">{{ t['kat_' ~ kategorie] }}</p>

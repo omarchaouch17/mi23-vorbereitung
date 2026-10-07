@@ -7,6 +7,8 @@ import math
 from risk import RANGES
 from translations import KATEGORIEN, DIAGNOSEN, ANDERE
 
+RAUCHEN_STATUS = ("nie", "ex", "aktuell")
+ZIGARETTEN_RANGE = (1, 100)   # Zigaretten pro Tag (Durchschnitt), nur bei aktuellem Raucher
 AGE_RANGE = (30, 79)  # wie in risk.framingham(): Score nur fuer 30-79 Jahre validiert
 
 # Feld -> (Label-Schluessel in translations, Grenzen, nur ganze Zahlen?, Einheit)
@@ -71,7 +73,27 @@ def validiere_risiko(form, t, patienten):
     if "hdl" in werte and "cholesterin" in werte and werte["hdl"] >= werte["cholesterin"]:
         fehler["hdl"] = t["err_hdl"]
 
-    werte["raucher"] = "raucher" in form
+    # Rauchen: Status (Pflicht) + bei aktuellem Raucher die durchschnittliche Menge pro Tag
+    status = form.get("rauchen", "")
+    if status not in RAUCHEN_STATUS:
+        fehler["rauchen"] = t["err_choose"].format(label=t["rauchen"])
+    werte["rauchen"] = status
+    werte["raucher"] = status == "aktuell"      # Framingham zaehlt nur "raucht aktuell ja/nein"
+    werte["zigaretten"] = None
+    if status == "aktuell":
+        low, high = ZIGARETTEN_RANGE
+        roh = form.get("zigaretten", "")
+        if not roh.strip():
+            fehler["zigaretten"] = t["err_required"].format(label=t["zigaretten"])
+        else:
+            wert = _zahl(roh)
+            if wert is None or not wert.is_integer():
+                fehler["zigaretten"] = t["err_number"].format(label=t["zigaretten"])
+            elif not low <= wert <= high:
+                fehler["zigaretten"] = t["err_range"].format(label=t["zigaretten"], low=low, high=high)
+            else:
+                werte["zigaretten"] = int(wert)
+
     werte["behandelt"] = "behandelt" in form
     return werte, fehler
 

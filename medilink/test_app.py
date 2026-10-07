@@ -7,7 +7,7 @@ from app import app
 from translations import texte, diagnose_uebersetzung, kategorie_uebersetzung, KATEGORIEN, DIAGNOSEN, ANDERE
 
 VALID = {"patient_id": "1", "sex": "m", "alter": "55", "cholesterin": "220",
-         "hdl": "50", "blutdruck": "140", "lang": "de"}
+         "hdl": "50", "blutdruck": "140", "rauchen": "nie", "lang": "de"}
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def fake_db(monkeypatch):
                         lambda name, text: saved.append(name) or 99)
     monkeypatch.setattr(app_module, "condition_hinzufuegen",
                         lambda patient_id, diagnose, kategorie: None)
-    monkeypatch.setattr(app_module, "risiko_speichern", lambda *args: None)
+    monkeypatch.setattr(app_module, "risiko_speichern", lambda *args, **kwargs: None)
     return saved
 
 
@@ -38,9 +38,15 @@ def fake_patienten(monkeypatch):
 @pytest.fixture
 def fake_risk(monkeypatch):
     """Merkt sich, zu welchen Patienten ein Score gespeichert wird."""
-    gespeichert = []
-    monkeypatch.setattr(app_module, "risiko_speichern",
-                        lambda patient_id, *args: gespeichert.append(patient_id))
+    class Liste(list):
+        details = []
+    gespeichert = Liste()
+    gespeichert.details = []
+
+    def speichern(patient_id, *args, **kwargs):
+        gespeichert.append(patient_id)
+        gespeichert.details.append((args, kwargs))
+    monkeypatch.setattr(app_module, "risiko_speichern", speichern)
     return gespeichert
 
 
@@ -71,9 +77,10 @@ def test_form_page_loads(client):
 def test_add_patient_shows_confirmation(client, fake_db):
     response = client.post("/hinzufuegen", data={
         "name": "Test Patient", "diagnose": "Hypertonie", "kategorie": "Kardiologie"})
-    assert response.status_code == 200
-    assert "erfolgreich gespeichert" in response.get_data(as_text=True)
+    assert response.status_code == 302
     assert fake_db == ["Test Patient"]
+    ort = response.headers["Location"]
+    assert "/risiko?" in ort and "patient=99" in ort and "neu=1" in ort and "lang=de" in ort
 
 
 def test_add_patient_empty_fields_rejected(client, fake_db):
@@ -320,7 +327,7 @@ def test_listed_diagnosis_is_saved_in_german(client, monkeypatch, fake_db):
     gespeichert = []
     monkeypatch.setattr(app_module, "condition_hinzufuegen",
                         lambda pid, diagnose, kategorie: gespeichert.append(diagnose))
-    assert post_patient(client, diagnose="Schlaganfall").status_code == 200
+    assert post_patient(client, diagnose="Schlaganfall").status_code == 302
     assert gespeichert == ["Schlaganfall"]
 
 
@@ -329,7 +336,7 @@ def test_other_diagnosis_uses_free_text(client, monkeypatch, fake_db):
     monkeypatch.setattr(app_module, "condition_hinzufuegen",
                         lambda pid, diagnose, kategorie: gespeichert.append(diagnose))
     response = post_patient(client, diagnose=ANDERE, diagnose_frei="  Gicht ")
-    assert response.status_code == 200 and gespeichert == ["Gicht"]
+    assert response.status_code == 302 and gespeichert == ["Gicht"]
 
 
 def test_other_without_free_text_is_rejected(client, fake_db):
@@ -452,23 +459,82 @@ def test_hdl_threshold_differs_by_sex():
 
 
 def test_result_page_shows_category_tips_and_emergency_note(client, fake_risk):
-    html = post_risk(client, cholesterin="260", blutdruck="150", raucher="on").get_data(as_text=True)
+    html = post_risk(client, cholesterin="260", blutdruck="150", rauchen="aktuell", zigaretten="15").get_data(as_text=True)
     assert 'class="kat kat-' in html and "Allgemeine Hinweise" in html
     assert "Rauchen" in html and "Blutdruck" in html and "cholesterin" in html
     assert "Notruf 112" in html and "keine ärztliche Beratung" in html
 
 
 def test_result_page_tips_follow_language(client, fake_risk):
-    html = post_risk(client, lang="fr", raucher="on").get_data(as_text=True)
+    html = post_risk(client, lang="fr", rauchen="aktuell", zigaretten="15").get_data(as_text=True)
     assert "Conseils généraux" in html and "appelez immédiatement le 112" in html
     assert "Allgemeine Hinweise" not in html
-    html = post_risk(client, lang="ar", raucher="on").get_data(as_text=True)
+    html = post_risk(client, lang="ar", rauchen="aktuell", zigaretten="15").get_data(as_text=True)
     assert "نصائح عامة" in html and "112" in html
 
 
-def test_patient_confirmation_has_no_tips_block(client, fake_db):
-    html = post_patient(client).get_data(as_text=True)
-    assert "Allgemeine Hinweise" not in html
+def test_new_patient_lands_on_risk_page_with_banner_and_preselection(client, monkeypatch, fake_db):
+    response = post_patient(client, lang="fr")
+    assert "lang=fr" in response.headers["Location"]
+    monkeypatch.setattr(app_module, "hole_patienten_liste", lambda: [(99, "Neu"), (1, "Demo")])
+    html = client.get(response.headers["Location"]).get_data(as_text=True)
+    assert "Calculez maintenant le risque cardiaque" in html
+    assert re.search(r'<option value="99"\s+selected', html)
+
+
+def test_risk_page_without_new_flag_has_no_banner(client):
+    assert "erfolg-box" not in client.get("/risiko").get_data(as_text=True).split("</style>")[-1]
+
+
+def test_smoking_select_and_cigarette_box_present(client):
+    html = client.get("/risiko").get_data(as_text=True)
+    for wert in ("nie", "ex", "aktuell"):
+        assert f'value="{wert}"' in html
+    assert "Zigaretten pro Tag (Durchschnitt)" in html and 'id="zigaretten-box"' in html
+
+
+def test_current_smoker_needs_cigarettes(client, fake_risk):
+    r = post_risk(client, rauchen="aktuell", zigaretten="")
+    assert r.status_code == 400 and fake_risk == []
+    for schlecht in ("0", "101", "abc"):
+        assert post_risk(client, rauchen="aktuell", zigaretten=schlecht).status_code == 400
+
+
+def test_smoking_status_required(client, fake_risk):
+    data = dict(VALID); del data["rauchen"]
+    assert client.post("/risiko_berechnen", data=data).status_code == 400
+
+
+def test_non_smokers_store_no_cigarettes(client, fake_risk):
+    for status in ("nie", "ex"):
+        post_risk(client, rauchen=status, zigaretten="30")
+    assert [d[1]["zigaretten_pro_tag"] for d in fake_risk.details] == [None, None]
+
+
+def test_cigarettes_saved_and_shown_on_result(client, fake_risk):
+    html = post_risk(client, rauchen="aktuell", zigaretten="15").get_data(as_text=True)
+    assert fake_risk.details[0][1]["zigaretten_pro_tag"] == 15
+    assert "Rauchstatus: Raucher, 15 Zigaretten pro Tag" in html
+
+
+def test_smoking_line_follows_language(client, fake_risk):
+    html = post_risk(client, lang="en", rauchen="aktuell", zigaretten="5").get_data(as_text=True)
+    assert "5 cigarettes per day" in html
+
+
+def test_db_migration_adds_cigarette_column(tmp_path, monkeypatch):
+    import sqlite3, fhir_db
+    monkeypatch.chdir(tmp_path)
+    con = sqlite3.connect("patienten.db")
+    con.execute("CREATE TABLE risk_scores (id INTEGER PRIMARY KEY, patient_id INTEGER, datum TEXT, "
+                "alter_jahre INTEGER, total_cholesterin REAL, hdl REAL, blutdruck REAL, "
+                "raucher INTEGER, behandelt INTEGER, risiko_prozent REAL)")
+    con.commit(); con.close()
+    fhir_db.erstelle_risk_score_tabelle()
+    con = sqlite3.connect("patienten.db")
+    spalten = [r[1] for r in con.execute("PRAGMA table_info(risk_scores)")]
+    con.close()
+    assert "zigaretten_pro_tag" in spalten
 
 
 # ---------- Animation beim Betreten ----------

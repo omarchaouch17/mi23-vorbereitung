@@ -86,9 +86,14 @@ def erstelle_risk_score_tabelle():
             raucher INTEGER,
             behandelt INTEGER,
             risiko_prozent REAL,
+            zigaretten_pro_tag INTEGER,
             FOREIGN KEY (patient_id) REFERENCES patienten (id)
         )
     """)
+    # Bestehende Datenbanken (ohne die neue Spalte) beim Start erweitern
+    spalten = [zeile[1] for zeile in cursor.execute("PRAGMA table_info(risk_scores)")]
+    if "zigaretten_pro_tag" not in spalten:
+        cursor.execute("ALTER TABLE risk_scores ADD COLUMN zigaretten_pro_tag INTEGER")
     verbindung.commit()
     verbindung.close()
 
@@ -106,12 +111,13 @@ def hole_neuestes_risiko(patient_id):
     verbindung.close()
     return ergebnis
 
-def risiko_speichern(patient_id, alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent):
+def risiko_speichern(patient_id, alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent,
+                     zigaretten_pro_tag=None):
     verbindung = sqlite3.connect("patienten.db")
     cursor = verbindung.cursor()
     cursor.execute(
-        "INSERT INTO risk_scores (patient_id, datum, alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (patient_id, datetime.date.today().isoformat(), alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent)
+        "INSERT INTO risk_scores (patient_id, datum, alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent, zigaretten_pro_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (patient_id, datetime.date.today().isoformat(), alter_wert, cholesterin, hdl, blutdruck, raucher, behandelt, risiko_prozent, zigaretten_pro_tag)
     )
     verbindung.commit()
     verbindung.close()

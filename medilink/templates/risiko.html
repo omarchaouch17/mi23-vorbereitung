@@ -4,6 +4,8 @@
 <h1>{{ t.risiko_titel }}</h1>
 <p style="color:#fbbf24; font-size:0.9em;">{{ t.risiko_hinweis }}</p>
 
+{% if neu_gespeichert %}<div class="erfolg-box" role="status">✓ {{ t.gespeichert }}<br>{{ t.weiter_risiko }}</div>{% endif %}
+
 {% if fehler %}<div class="fehler-box" role="alert">{{ t.fehler_titel }}{% if fehler.allgemein %}<br>{{ fehler.allgemein }}{% endif %}</div>{% endif %}
 
 {% if patienten %}
@@ -41,7 +43,26 @@
     </div>
     {% endfor %}
 
-    <label class="check"><input type="checkbox" name="raucher" {% if 'raucher' in werte %}checked{% endif %}> {{ t.raucher }}</label>
+    <div class="feld">
+        <label for="rauchen">{{ t.rauchen }}</label>
+        <select id="rauchen" name="rauchen" {% if fehler.get('rauchen') %}class="ungueltig"{% endif %}>
+            <option value="" disabled {% if not werte.get('rauchen') %}selected{% endif %}>{{ t.waehlen }}</option>
+            <option value="nie" {% if werte.get('rauchen') == 'nie' %}selected{% endif %}>{{ t.rauchen_nie }}</option>
+            <option value="ex" {% if werte.get('rauchen') == 'ex' %}selected{% endif %}>{{ t.rauchen_ex }}</option>
+            <option value="aktuell" {% if werte.get('rauchen') == 'aktuell' %}selected{% endif %}>{{ t.rauchen_aktuell }}</option>
+        </select>
+        <div class="fehler" id="fehler-rauchen" role="alert">{{ fehler.get('rauchen', '') }}</div>
+    </div>
+
+    <div class="feld" id="zigaretten-box">
+        <label for="zigaretten">{{ t.zigaretten }}</label>
+        <input type="number" id="zigaretten" name="zigaretten" min="1" max="100" step="1" inputmode="numeric"
+               data-label="{{ t.zigaretten }}" value="{{ werte.get('zigaretten', '') or '' }}"
+               {% if fehler.get('zigaretten') %}class="ungueltig"{% endif %}>
+        <small class="hinweis">{{ t.bereich }}: <bdi dir="ltr">1–100</bdi> · {{ t.zigaretten_hinweis }}</small>
+        <div class="fehler" id="fehler-zigaretten" role="alert">{{ fehler.get('zigaretten', '') }}</div>
+    </div>
+
     <label class="check"><input type="checkbox" name="behandelt" {% if 'behandelt' in werte %}checked{% endif %}> {{ t.behandelt }}</label>
     <br>
     <button type="submit">{{ t.berechnen }}</button>
@@ -76,6 +97,11 @@
         return msg === '';
     }
     var felder = form.querySelectorAll('input[type=number]');
+    var rauchen = document.getElementById('rauchen'), zigBox = document.getElementById('zigaretten-box');
+    function zigAktiv() { return rauchen.value === 'aktuell'; }
+    function zigUmschalten() { zigBox.style.display = zigAktiv() ? '' : 'none'; }
+    rauchen.addEventListener('change', function () { zeige(rauchen, ''); zigUmschalten(); });
+    zigUmschalten();
     felder.forEach(function (el) {
         el.addEventListener('blur', function () { if (el.value !== '') { pruefe(el); } });
         el.addEventListener('input', function () { zeige(el, ''); });
@@ -85,7 +111,11 @@
         var wahl = form.elements['patient_id'];
         if (wahl.value === '') { zeige(wahl, fmt(M.choose, { label: {{ t.patient|tojson }} })); ok = false; }
         else { zeige(wahl, ''); }
-        felder.forEach(function (el) { if (!pruefe(el)) { ok = false; } });
+        if (rauchen.value === '') { zeige(rauchen, fmt(M.choose, { label: {{ t.rauchen|tojson }} })); ok = false; }
+        felder.forEach(function (el) {
+            if (el.name === 'zigaretten' && !zigAktiv()) { return; }     // only relevant for current smokers
+            if (!pruefe(el)) { ok = false; }
+        });
         var chol = form.elements['cholesterin'], hdl = form.elements['hdl'];
         if (ok && Number(hdl.value) >= Number(chol.value)) { zeige(hdl, M.hdl); ok = false; }
         if (!ok) { e.preventDefault(); }

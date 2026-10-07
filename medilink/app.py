@@ -101,8 +101,8 @@ def hinzufuegen():
     patient_id = patient_hinzufuegen(werte["name"], "siehe conditions")
     condition_hinzufuegen(patient_id, werte["diagnose"], werte["kategorie"])
 
-    return render_template("bestaetigung.html", nachricht=t["gespeichert"],
-                           zeige_sprachen=False)
+    # Direkt weiter zur Score-Berechnung, der neue Patient ist schon ausgewaehlt
+    return redirect(url_for("risiko_formular", patient=patient_id, neu=1, lang=aktuelle_sprache()))
 
 
 @app.route("/loeschen/<int:patient_id>", methods=["POST"])
@@ -130,16 +130,26 @@ def patienten_auswahl():
     return [(pid, f"{name} (#{pid})" if haeufigkeit[name] > 1 else name) for pid, name in liste]
 
 
-def _risiko_seite(werte, fehler, status=200):
+def rauchzeile(werte, t):
+    """z.B. 'Rauchstatus: Raucher, 15 Zigaretten pro Tag' fuer die Ergebnis-Seite."""
+    zeile = f"{t['rauchen']}: {t['rauchen_' + werte['rauchen']]}"
+    if werte["zigaretten"]:
+        zeile += f", {werte['zigaretten']} {t['zigaretten_kurz']}"
+    return zeile
+
+
+def _risiko_seite(werte, fehler, status=200, neu=False):
     """Rendert das Risiko-Formular (leer oder mit Eingaben + roten Meldungen)."""
     return render_template("risiko.html", werte=werte, fehler=fehler, felder=RISIKO_FELDER,
-                           patienten=patienten_auswahl(), sprach_pfad="/risiko"), status
+                           patienten=patienten_auswahl(), neu_gespeichert=neu,
+                           sprach_pfad="/risiko"), status
 
 
 @app.route("/risiko")
 def risiko_formular():
     # /risiko?patient=3 waehlt den Patienten schon vor
-    return _risiko_seite({"patient_id": request.args.get("patient", "")}, {})
+    return _risiko_seite({"patient_id": request.args.get("patient", "")}, {},
+                         neu=bool(request.args.get("neu")))
 
 
 @app.route("/risiko_berechnen", methods=["POST"])
@@ -159,11 +169,13 @@ def risiko_berechnen():
 
     # Der Score gehoert zum gewaehlten, bereits vorhandenen Patienten (kein neuer Patient mehr)
     risiko_speichern(werte["patient_id"], werte["alter"], werte["cholesterin"], werte["hdl"],
-                     werte["blutdruck"], werte["raucher"], werte["behandelt"], risiko_prozent)
+                     werte["blutdruck"], werte["raucher"], werte["behandelt"], risiko_prozent,
+                     zigaretten_pro_tag=werte["zigaretten"])
 
     kategorie = risiko_kategorie(risiko_prozent)
     return render_template("bestaetigung.html",
                            nachricht=f"{werte['name']}: " + t["ergebnis"].format(p=risiko_prozent),
+                           rauchzeile=rauchzeile(werte, t),
                            kategorie=kategorie, tipps=hole_tipps(werte, kategorie),
                            zeige_sprachen=False)
 

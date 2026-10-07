@@ -8,7 +8,6 @@ from risk import framingham
 import sqlite3
 
 app = Flask(__name__)
-
 from fhir_db import erstelle_tabelle, erstelle_condition_tabelle, erstelle_risk_score_tabelle
 
 erstelle_tabelle()
@@ -84,7 +83,7 @@ def hinzufuegen():
     )
 
 
-@app.route("/loeschen/<int:patient_id>")
+@app.route("/loeschen/<int:patient_id>", methods=["POST"])
 def loeschen(patient_id):
     patient_loeschen(patient_id)
 

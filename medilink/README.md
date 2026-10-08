@@ -23,6 +23,18 @@ Portfolio-Projekt im Rahmen meines Studiums Medizinische Informatik (HSNR Krefel
 - Einstiegsanimation (respektiert `prefers-reduced-motion`)
 - ~100 automatisierte Tests (pytest)
 
+## Datenschutz & Statistik
+- `/statistik`: anonyme Übersicht (Besucher, Patienten, Berechnungen, Ø-Risiko, Liste ohne Namen).
+- Patienten anderer Besucher erscheinen nur als "Anonym #n"; Namen, Verlauf und Löschen nur für den eigenen Browser.
+- Besucherzähler ohne IP-Adresse (zufälliger Token im Cookie).
+- Admin-Ansicht (alle Namen/Werte): Umgebungsvariablen `ADMIN_KEY` und `SECRET_KEY` setzen, dann `/admin?key=...` aufrufen.
+
+## Dauerhafte Speicherung
+- Ohne Konfiguration nutzt die App eine lokale SQLite-Datei (`patienten.db`).
+- Mit der Umgebungsvariable `DATABASE_URL` (PostgreSQL, z. B. kostenlos bei Neon) bleiben alle Daten dauerhaft erhalten,
+  auch bei Neustart und Deploy auf Render. Die Schicht `db.py` übersetzt die SQL-Anweisungen automatisch.
+- Die Tests benutzen nie die echte Datenbank (`conftest.py`).
+
 ## Hinweis zum Rauchen
 Der Framingham-Score verwendet nur "aktuell Raucher: ja/nein". Die Zigarettenanzahl wird
 zur Dokumentation gespeichert und angezeigt, verändert den Prozentwert aber nicht.

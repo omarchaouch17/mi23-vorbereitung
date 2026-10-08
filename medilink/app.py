@@ -1,6 +1,5 @@
 import hmac
 import os
-import sqlite3
 import uuid
 from datetime import timedelta
 
@@ -10,13 +9,16 @@ from fhir_db import (
     erstelle_tabelle, erstelle_condition_tabelle, erstelle_risk_score_tabelle,
     patient_hinzufuegen, condition_hinzufuegen, patient_loeschen,
     risiko_speichern, hole_neuestes_risiko, hole_alle_risiken,
-    erstelle_besuche_tabelle, besuch_zaehlen, hole_statistik, hole_alle_eintraege
+    erstelle_besuche_tabelle, besuch_zaehlen, hole_statistik, hole_alle_eintraege,
+    hole_patienten_mit_diagnosen, hole_alle_patienten
 )
 from translations import (
     texte, uebersetze_diagnose, kategorie_name, KATEGORIEN, DIAGNOSEN, ANDERE
 )
 from risk import framingham
 from ratschlaege import risiko_kategorie, hole_tipps
+import assistent
+import faq
 from validierung import (
     RISIKO_FELDER, validiere_risiko, validiere_patient
 )
@@ -86,19 +88,6 @@ def sprache_fuer_alle_templates():
     }
 
 
-def hole_patienten_mit_diagnosen():
-    verbindung = sqlite3.connect("patienten.db")
-    cursor = verbindung.cursor()
-    cursor.execute("""
-        SELECT patienten.name, conditions.code_text, conditions.category_text, patienten.id
-        FROM patienten
-        LEFT JOIN conditions ON patienten.id = conditions.patient_id
-    """)
-    ergebnisse = cursor.fetchall()
-    verbindung.close()
-    return ergebnisse
-
-
 @app.route("/")
 def home():
     sprache = aktuelle_sprache()
@@ -156,16 +145,6 @@ def loeschen(patient_id):
     return redirect(url_for("home", lang=aktuelle_sprache()))
 
 
-def hole_alle_patienten():
-    """Alle Patienten als [(id, name), ...], alphabetisch."""
-    verbindung = sqlite3.connect("patienten.db")
-    cursor = verbindung.cursor()
-    cursor.execute("SELECT id, name FROM patienten ORDER BY name COLLATE NOCASE, id")
-    ergebnisse = cursor.fetchall()
-    verbindung.close()
-    return ergebnisse
-
-
 def hole_patienten_liste():
     """Nur Patienten, die dieser Besucher sehen darf (eigene oder alle fuer Admin)."""
     return [(pid, name) for pid, name in hole_alle_patienten() if darf_sehen(pid)]
@@ -191,7 +170,7 @@ def rauchzeile(werte, t):
 def _risiko_seite(werte, fehler, status=200, neu=False):
     """Rendert das Risiko-Formular (leer oder mit Eingaben + roten Meldungen)."""
     return render_template("risiko.html", werte=werte, fehler=fehler, felder=RISIKO_FELDER,
-                           patienten=patienten_auswahl(), neu_gespeichert=neu,
+                           patienten=patienten_auswahl(), neu_gespeichert=neu, chat_aktiv=assistent.chat_aktiv(),
                            sprach_pfad="/risiko"), status
 
 
@@ -223,7 +202,13 @@ def risiko_berechnen():
                      zigaretten_pro_tag=werte["zigaretten"])
 
     kategorie = risiko_kategorie(risiko_prozent)
-    return render_template("bestaetigung.html",
+    # Fuer den KI-Assistenten merken (ohne Namen)
+    session["ergebnis"] = {"sex": werte["sex"], "alter": werte["alter"], "cholesterin": werte["cholesterin"],
+                           "hdl": werte["hdl"], "blutdruck": werte["blutdruck"],
+                           "rauchen": werte["rauchen"], "zigaretten": werte["zigaretten"],
+                           "risiko_prozent": risiko_prozent, "kategorie": kategorie}
+    return render_template("bestaetigung.html", chat_aktiv=assistent.chat_aktiv(),
+                           vorschlaege=faq.vorschlaege(aktuelle_sprache()),
                            nachricht=f"{werte['name']}: " + t["ergebnis"].format(p=risiko_prozent),
                            rauchzeile=rauchzeile(werte, t),
                            kategorie=kategorie, tipps=hole_tipps(werte, kategorie),
@@ -236,6 +221,32 @@ def verlauf(patient_id):
         abort(404)
     return render_template("verlauf.html", risiken=hole_alle_risiken(patient_id),
                            patient_id=patient_id)
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    """KI-Assistent: JSON {message, history}; Antwort JSON {antwort} oder {fehler}."""
+    t = texte[aktuelle_sprache()]
+    daten = request.get_json(silent=True) or {}
+    nachricht = daten.get("message")
+    if not isinstance(nachricht, str) or not nachricht.strip():
+        return {"fehler": t["err_required"].format(label="")}, 400
+    nachricht = nachricht.strip()
+    if len(nachricht) > assistent.MAX_NACHRICHT:
+        return {"fehler": t["chat_zu_lang"]}, 400
+    if assistent.ist_notfall(nachricht):   # Notfall: feste Antwort, keine KI
+        return {"antwort": t["notfall"]}
+    if not assistent.chat_aktiv():         # kostenloser Standard: regelbasierter Hilfe-Assistent
+        return {"antwort": faq.antworte(nachricht, aktuelle_sprache(), session.get("ergebnis"))}
+    if session.get("chat_n", 0) >= assistent.LIMIT_BESUCHER or assistent.tageslimit_erreicht():
+        return {"fehler": t["chat_limit"]}, 429
+    session["chat_n"] = session.get("chat_n", 0) + 1
+    try:
+        antwort = assistent.frage_assistent(nachricht, daten.get("history"), aktuelle_sprache(),
+                                            session.get("ergebnis"))
+    except assistent.AssistentFehler:
+        return {"fehler": t["chat_fehler"]}, 503
+    return {"antwort": antwort}
 
 
 @app.route("/admin")

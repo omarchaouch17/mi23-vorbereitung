@@ -8,6 +8,8 @@
 
 {% if fehler %}<div class="fehler-box" role="alert">{{ t.fehler_titel }}{% if fehler.allgemein %}<br>{{ fehler.allgemein }}{% endif %}</div>{% endif %}
 
+<p class="hinweis">{{ t.chat_teaser }}</p>
+
 {% include "_werte_guide.html" %}
 
 {% if patienten %}

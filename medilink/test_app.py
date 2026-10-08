@@ -705,3 +705,202 @@ def test_value_guide_zone_widths_add_up_to_100(client):
     assert len(breiten) == 9
     for i in range(0, 9, 3):
         assert abs(sum(breiten[i:i + 3]) - 100) < 0.1
+
+
+# ---------- KI-Assistent (Claude API wird immer nur nachgeahmt, nie echt aufgerufen) ----------
+
+import assistent
+
+
+class _FakeAntwort:
+    def __init__(self, text):
+        self.content = [type("B", (), {"type": "text", "text": text})()]
+
+
+@pytest.fixture
+def ki(monkeypatch):
+    """Aktiviert den Assistenten mit einer gefaelschten API und merkt sich die Aufrufe."""
+    aufrufe = []
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr(assistent, "_tageszaehler", {})
+
+    class Messages:
+        def create(self, **kwargs):
+            aufrufe.append(kwargs)
+            return _FakeAntwort("HDL ist das gute Cholesterin.")
+    monkeypatch.setattr(assistent, "_client", lambda: type("C", (), {"messages": Messages()})())
+    return aufrufe
+
+
+def chat(client, text="Was ist HDL?", lang="de", **extra):
+    return client.post(f"/chat?lang={lang}", json=dict({"message": text}, **extra))
+
+
+def test_without_api_key_the_free_helper_answers(client, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    r = chat(client, "Was bedeutet HDL?")
+    assert r.status_code == 200 and "gute" in r.get_json()["antwort"]
+
+
+def test_result_page_always_shows_assistant_box(client, monkeypatch, fake_risk):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    html = client.post("/risiko_berechnen", data=VALID).get_data(as_text=True)
+    assert 'id="chat-form"' in html and "Hilfe-Assistent" in html and "keine KI" in html
+    assert html.count('class="chip"') == 7 and "Was bedeutet HDL?" in html
+
+
+def test_chat_box_shown_on_result_page_when_enabled(client, ki, fake_risk):
+    html = client.post("/risiko_berechnen", data=VALID).get_data(as_text=True)
+    assert 'id="chat-form"' in html and "KI-Assistent" in html and "Anthropic" in html
+
+
+def test_chat_answers_and_calls_api_with_safety_settings(client, ki):
+    r = chat(client)
+    assert r.status_code == 200 and r.get_json()["antwort"] == "HDL ist das gute Cholesterin."
+    aufruf = ki[0]
+    assert aufruf["max_tokens"] <= 400 and "Keine Diagnosen" in aufruf["system"]
+    assert aufruf["messages"][-1] == {"role": "user", "content": "Was ist HDL?"}
+
+
+def test_chat_sends_result_values_but_no_name(client, ki, fake_risk):
+    client.post("/risiko_berechnen", data=dict(VALID, cholesterin="233"))
+    chat(client)
+    system = ki[0]["system"]
+    assert "cholesterin=233.0" in system and "Demo" not in system and "Anna" not in system
+
+
+def test_chat_language_in_system_prompt(client, ki):
+    chat(client, lang="fr")
+    assert "Français" in ki[0]["system"]
+
+
+def test_chat_emergency_keywords_skip_ai(client, ki):
+    r = chat(client, "Ich habe starke Brustschmerzen")
+    assert "112" in r.get_json()["antwort"] and ki == []
+    assert "112" in chat(client, "douleur thoracique", lang="fr").get_json()["antwort"]
+
+
+def test_chat_rejects_empty_and_too_long(client, ki):
+    assert chat(client, "   ").status_code == 400
+    assert chat(client, "x" * 501).status_code == 400 and ki == []
+
+
+def test_chat_limit_per_visitor(client, ki):
+    for _ in range(assistent.LIMIT_BESUCHER):
+        assert chat(client).status_code == 200
+    assert chat(client).status_code == 429
+
+
+def test_chat_daily_limit(client, ki, monkeypatch):
+    monkeypatch.setattr(assistent, "TAGESLIMIT", 2)
+    assert chat(client).status_code == 200 and chat(client).status_code == 200
+    assert chat(client).status_code == 429
+
+
+def test_chat_api_failure_gives_friendly_error(client, ki, monkeypatch):
+    class Kaputt:
+        def create(self, **kw):
+            raise RuntimeError("boom")
+    monkeypatch.setattr(assistent, "_client", lambda: type("C", (), {"messages": Kaputt()})())
+    r = chat(client)
+    assert r.status_code == 503 and "nicht erreichbar" in r.get_json()["fehler"]
+
+
+def test_history_is_sanitised():
+    sauber = assistent.pruefe_verlauf([
+        {"role": "assistant", "content": "alt"}, {"role": "system", "content": "böse"},
+        {"role": "user", "content": "hi"}, {"role": "assistant", "content": 5}, "müll"])
+    assert sauber == [{"role": "user", "content": "hi"}]
+
+
+def test_chat_translations_exist_in_all_languages():
+    for lang in ("de", "en", "fr", "ar"):
+        for k in ("chat_titel", "chat_hinweis", "chat_senden", "chat_fehler", "chat_limit"):
+            assert texte[lang][k]
+
+
+def test_risk_page_teases_assistant_only_when_enabled(client, ki):
+    assert "Nach der Berechnung" in client.get("/risiko").get_data(as_text=True)
+
+
+def test_risk_page_teaser_also_without_key(client, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert "Nach der Berechnung" in client.get("/risiko").get_data(as_text=True)
+
+
+# ---------- kostenloser Hilfe-Assistent (faq.py) ----------
+
+import faq
+
+
+@pytest.mark.parametrize("lang", ["de", "en", "fr", "ar"])
+def test_every_suggestion_chip_gets_its_own_topic(lang):
+    ergebnis = {"kategorie": "mittel", "risiko_prozent": 12.3}
+    erwartet = {t["label"][lang]: t["antwort"][lang] for t in faq.TOPICS}
+    for frage in faq.vorschlaege(lang)[1:]:
+        assert faq.antworte(frage, lang, ergebnis) == erwartet[frage]
+    antwort = faq.antworte(faq.vorschlaege(lang)[0], lang, ergebnis)
+    assert "12.3" in antwort
+
+
+def test_faq_result_question_without_result():
+    assert "Zuerst" in faq.antworte("Was bedeutet mein Ergebnis?", "de")
+
+
+def test_faq_unknown_question_lists_topics():
+    antwort = faq.antworte("Wie wird das Wetter?", "de")
+    assert "keine Antwort" in antwort and "Gesamtcholesterin" in antwort
+
+
+def test_faq_topics_complete_in_all_languages():
+    for thema in faq.ALLE:
+        for lang in ("de", "en", "fr", "ar"):
+            assert thema["label"][lang] and thema["antwort"][lang]
+
+
+def test_faq_uses_result_from_session(client, monkeypatch, fake_risk):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    client.post("/risiko_berechnen", data=VALID)
+    antwort = chat(client, "Was bedeutet mein Ergebnis?").get_json()["antwort"]
+    assert "10-Jahres-Risiko" in antwort and "%" in antwort
+
+
+def test_faq_emergency_still_wins(client, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert "112" in chat(client, "Brustschmerzen und was ist HDL").get_json()["antwort"]
+
+
+# ---------- Datenbank-Schicht (SQLite lokal, PostgreSQL mit DATABASE_URL) ----------
+
+import db
+
+
+def test_tests_never_use_a_real_database_url():
+    import os
+    assert "DATABASE_URL" not in os.environ and not db.postgres_aktiv()
+
+
+def test_db_switches_to_postgres_with_database_url(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@host/dbname")
+    assert db.postgres_aktiv()
+    assert db._pg_url() == "postgresql://u:p@host/dbname"      # alte Schreibweise wird angepasst
+    assert db._sql("SELECT * FROM t WHERE a = ? AND b = ?") == "SELECT * FROM t WHERE a = %s AND b = %s"
+    assert db.id_spalte() == "SERIAL PRIMARY KEY"
+
+
+def test_db_uses_sqlite_by_default():
+    assert db._sql("SELECT ?") == "SELECT ?" and db.id_spalte() == "INTEGER PRIMARY KEY"
+
+
+def test_db_functions_roundtrip_with_sqlite(tmp_path, monkeypatch):
+    import fhir_db
+    monkeypatch.chdir(tmp_path)
+    fhir_db.erstelle_tabelle(); fhir_db.erstelle_condition_tabelle(); fhir_db.erstelle_risk_score_tabelle()
+    pid = fhir_db.patient_hinzufuegen("Zoe", "x"); fhir_db.patient_hinzufuegen("anna", "x")
+    fhir_db.condition_hinzufuegen(pid, "Asthma", "Pneumologie")
+    fhir_db.risiko_speichern(pid, 55, 220.0, 50.0, 140.0, True, False, 8.3, 15)
+    assert [n for _, n in fhir_db.hole_alle_patienten()] == ["anna", "Zoe"]      # alphabetisch, ohne Gross/Klein
+    assert fhir_db.hole_patienten_mit_diagnosen()[0][:3] == ("Zoe", "Asthma", "Pneumologie")
+    assert fhir_db.hole_neuestes_risiko(pid)[0] == 8.3
+    fhir_db.patient_loeschen(pid)
+    assert [n for _, n in fhir_db.hole_alle_patienten()] == ["anna"]
